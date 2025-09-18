@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RAG QA Bot Demo</title>
+  <style>
+    :root { --fg:#111; --muted:#666; --bg:#fff; --panel:#f6f6f6; --accent:#2563eb; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans TC", Arial;
+           color:var(--fg); background:var(--bg); max-width: 720px; margin: 40px auto; padding: 0 16px; }
+    h2 { margin: 0 0 16px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    input[type="text"] { flex:1; padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:16px; }
+    button { padding:10px 14px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .hint { margin-top:8px; font-size:13px; color:var(--muted); }
+    .card { margin-top:16px; background:var(--panel); padding:16px; border-radius:12px; }
+    .kvs { font-size:14px; line-height:1.6; white-space:pre-wrap; }
+    .sources { margin:8px 0 0; padding-left:20px; }
+    .overlay { position: fixed; inset:0; background: rgba(0,0,0,.25); display:none; align-items:center; justify-content:center; z-index: 9999; }
+    .overlay.show { display:flex; }
+    .spinner { width:48px; height:48px; border:5px solid #fff; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg) } }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+  </style>
+</head>
+<body>
+  <h2>RAG QA Bot Demo</h2>
+
+  <div class="row">
+    <input type="text" id="question" placeholder="輸入你的問題（例：請假流程怎麼走？）" autocomplete="off" />
+    <button id="askBtn">提問</button>
+  </div>
+  <div class="hint">此頁面將把請求送到 <code>/api/ask</code>（由 Cloudflare Worker 代理至後端）。</div>
+
+  <div class="card" id="result" hidden>
+    <div class="kvs" id="answer"></div>
+    <div id="sourcesWrap" hidden>
+      <strong>📚 來源</strong>
+      <ul class="sources" id="sources"></ul>
+    </div>
+  </div>
+
+  <div id="loading" class="overlay" aria-live="polite" aria-busy="true">
+    <div class="spinner" aria-label="Loading"></div>
+    <span class="sr-only">資料載入中…</span>
+  </div>
+
+  <script>
+    const input  = document.getElementById("question");
+    const btn    = document.getElementById("askBtn");
+    const panel  = document.getElementById("result");
+    const out    = document.getElementById("answer");
+    const srcUl  = document.getElementById("sources");
+    const srcWrap= document.getElementById("sourcesWrap");
+    const loading= document.getElementById("loading");
+
+    const API_BASE = "/api"; // 由 Worker 同源代理，避免 CORS / 網域差異
+
+    function toggleLoading(on) {
+      loading.classList.toggle("show", on);
+      input.disabled = on; btn.disabled = on;
+    }
+
+    function renderSources(sources) {
+      srcUl.innerHTML = "";
+      if (!sources) { srcWrap.hidden = true; return; }
+      let arr = sources;
+      if (typeof sources === "string") {
+        // 嘗試以分號/換行切片；或直接當作單一來源
+        const bySemi = sources.split(/[\n;]+/).map(s => s.trim()).filter(Boolean);
+        arr = bySemi.length ? bySemi : [sources];
+      }
+      if (Array.isArray(arr) && arr.length) {
+        arr.forEach((s) => {
+          const li = document.createElement("li");
+          // 若是 URL 就轉為可點連結
+          try {
+            const u = new URL(s);
+            const a = document.createElement("a");
+            a.href = u.href; a.target = "_blank"; a.rel = "noopener";
+            a.textContent = u.hostname + (u.pathname !== "/" ? u.pathname : "");
+            li.appendChild(a);
+          } catch {
+            li.textContent = s;
+          }
+          srcUl.appendChild(li);
+        });
+        srcWrap.hidden = false;
+      } else {
+        srcWrap.hidden = true;
+      }
+    }
+
+    async function ask() {
+      const q = input.value.trim();
+      if (!q) return;
+      toggleLoading(true);
+      panel.hidden = false;
+      out.textContent = "";
+      renderSources(null);
+
+      try {
+        const res = await fetch(`${API_BASE}/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ q })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        // 期待後端回傳格式：
+        // { question: string, answer: string, context?: string|string[], sources?: string|string[] }
+        const question = data.question ?? q;
+        const answer   = data.answer ?? "(無答案)";
+        const context  = data.context;
+
+        const ctxBlock = context
+          ? (Array.isArray(context) ? context.join("\n- ") : String(context))
+          : null;
+
+        out.textContent =
+          `📌 問題：${question}\n\n` +
+          (ctxBlock ? `🧩 檢索摘要：\n- ${ctxBlock}\n\n` : "") +
+          `🤖 答案：\n${answer}`;
+
+        renderSources(data.sources ?? context);
+      } catch (err) {
+        out.textContent = `⚠️ 請求失敗：${err}`;
+        renderSources(null);
+      } finally {
+        toggleLoading(false);
+        // 加速下一次輸入
+        input.select();
+      }
+    }
+
+    btn.addEventListener("click", ask);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+  </script>
+</body>
+</html>
