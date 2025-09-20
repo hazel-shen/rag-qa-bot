@@ -1,0 +1,10 @@
+repos:
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      args:
+        - --baseline
+        - .secrets.baseline
+        - --force-use-all-plugins # 強制啟用所有 plugin (High Entropy, Private Key 等)
+        - --exclude-files
+        - '.*\.(?!tfstate$|tfvars$).*' # 忽略 tfstate 和 tfvars
