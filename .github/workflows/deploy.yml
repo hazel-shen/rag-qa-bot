@@ -4,8 +4,10 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "backend/**"
+      - "backend/app/**"
       - ".github/workflows/deploy.yml"
+      - "backend/Dockerfile"
+      - "backend/requirements.txt"
 
 jobs:
   build-push:
@@ -29,6 +31,7 @@ jobs:
           echo "IMAGE=ghcr.io/${OWNER_LC}/${REPO_LC}" >> $GITHUB_OUTPUT
           echo "TAG_LATEST=ghcr.io/${OWNER_LC}/${REPO_LC}:latest" >> $GITHUB_OUTPUT
           echo "TAG_SHA=ghcr.io/${OWNER_LC}/${REPO_LC}:git-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "REPO_LC=${REPO_LC}" >> $GITHUB_OUTPUT   # 輸出 repo 名小寫
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -52,3 +55,55 @@ jobs:
             ${{ steps.vars.outputs.TAG_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ap-northeast-1
+
+      - name: Deploy to EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ${{ needs.build-push.outputs.tag_latest }}" \
+            --parameters commands="$(cat <<'EOS'
+          set -euo pipefail
+
+          IMAGE="${IMAGE}"
+          CONTAINER_NAME="${CONTAINER_NAME}"
+          SECRET_ARN="${GHCR_SECRET_ARN}"
+          GHCR_USER="${GHCR_USERNAME}"
+
+          # 從 Secrets Manager 拿 PAT 並登入 GHCR
+          GHCR_PAT="$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query 'SecretString' --output text)"
+          echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # 拉最新 image 並跑 container
+          docker pull "$IMAGE"
+          docker rm -f "$CONTAINER_NAME" || true
+          docker run -d --name "$CONTAINER_NAME" --restart always -p 8080:80 "$IMAGE"
+
+          # 健康檢查
+          if ! curl -sf "http://127.0.0.1:8080/health" >/dev/null; then
+            echo "❌ Health check failed, dumping logs..."
+            docker logs "$CONTAINER_NAME" || true
+            exit 1
+          fi
+          echo "✅ Deploy success"
+          EOS
+          )"
+        env:
+          IMAGE: ${{ needs.build-push.outputs.tag_latest }}
+          CONTAINER_NAME: ${{ needs.build-push.outputs.repo_lc }}
+          GHCR_SECRET_ARN: ${{ secrets.GHCR_SECRET_ARN }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
