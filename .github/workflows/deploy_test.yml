@@ -1,0 +1,27 @@
+name: Deploy HelloWorld
+
+on:
+  workflow_dispatch: # 手動觸發
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ap-northeast-1
+
+      - name: Run HelloWorld on EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --targets "Key=instanceIds,Values=${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "HelloWorld test" \
+            --parameters 'commands=["echo Hello from GitHub Actions 🚀 > /tmp/hello.txt","cat /tmp/hello.txt"]'
