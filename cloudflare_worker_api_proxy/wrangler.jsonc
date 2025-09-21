@@ -1,0 +1,14 @@
+{
+  "name": "api-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-20",
+  "compatibility_flags": ["nodejs_compat"],
+  // "routes": [
+  //   { "pattern": "api.yourdomain.com/*", "zone_name": "yourdomain.com" }
+  // ], <--- 如果有自己的域名才要設定，沒有的話 wrangler 會自動給你一個網址
+  "vars": {
+    "TARGET_BASE_URL": "https://httpbin.org", // 先測試用
+    // ⚠️ 測試用，正式要用 secret，用以下指令放到環境變數
+    // wrangler secret put WORKER_SHARED_SECRET
+  }
+}

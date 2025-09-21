@@ -1,0 +1,21 @@
+{
+  "resourceMetrics": [{
+    "resource": { "attributes": [
+      { "key": "service.name", "value": { "stringValue": "api-proxy" } }
+    ]},
+    "scopeMetrics": [{
+      "scope": { "name": "manual" },
+      "metrics": [{
+        "name": "test_metric",
+        "unit": "s",
+        "gauge": { "dataPoints": [{
+          "timeUnixNano": 1758378890974942976,
+          "asInt": 1,
+          "attributes": [
+            { "key": "bar_label", "value": { "stringValue": "abc" } }
+          ]
+        }]}
+      }]
+    }]
+  }]
+}
