@@ -1,0 +1,24 @@
+name: rag_qa_bot
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pydantic=2.*
+  - python-dotenv
+  - tqdm
+  - lxml
+  - beautifulsoup4
+  - conda-forge::faiss-cpu # 🔒 強制從 conda-forge 裝 faiss-cpu
+  - pip:
+      - fastapi
+      - uvicorn
+      - prometheus-client
+      - openai>=1.42.0
+      - python-docx # 解析 DOCX
+      - markdown-it-py # Markdown 轉純文字（可選）
+      - pymupdf # PDF 解析 (PyMuPDF, pip 專用)
+      - pytest
+      - pytest-mock
