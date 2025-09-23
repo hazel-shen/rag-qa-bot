@@ -17,6 +17,7 @@ class Settings(BaseModel):
     docstore_path: str = os.getenv("DOCSTORE_PATH", "backend/data/docstore.jsonl")
     top_k: int = int(os.getenv("TOP_K", "3"))
     max_context_chars: int = int(os.getenv("MAX_CONTEXT_CHARS", "1800"))
+    answer_single_line: bool = False
     answer_max_tokens: int = int(os.getenv("ANSWER_MAX_TOKENS", "400"))
     # === Rate Limit 相關 ===
     rate_limit_per_ip_per_min: int = int(os.getenv("RATE_LIMIT_PER_IP_PER_MIN", "30"))

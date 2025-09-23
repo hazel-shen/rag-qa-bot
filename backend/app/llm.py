@@ -27,7 +27,10 @@ def _estimate_cost(model: str, in_tokens: int, out_tokens: int) -> float:
 def answer_with_context(query: str, context: str) -> Dict[str, Any]:
     client = _client_lazy()
     system = (
-        "你是一個企業內部 FAQ 助理。回答時要簡潔，並在可能時引用來源（source）。"
+        "請用繁體中文回答，直接給出重點與步驟。"
+        "不要加開場白或結語，不要出現「以下」「如下」等過場詞。"
+        "不要在答案中附加任何來源或 (source: ...)，來源由系統在 meta 中提供。"
+        "若需要列點，最多 5 點，避免重複同義句。"
         "若資訊不足，請坦承不足。"
     )
     user = f"問題：{query}\n\n已檢索到的相關內容：\n{context}"

@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Tuple
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from .utils.text_cleaner import clean_answer, squash_whitespace
 from .security import validate_input, load_policy
 from .rate_limit import rate_limiter, init_rate_limiter
 from .reranker import rerank
@@ -173,12 +174,15 @@ async def ask(req: Request):
         cands = _retrieve_candidates(query, candidate_k)
         topk = _rerank_candidates(query, cands)
         answer_text, out, context = _answer_with_context(query, topk)
-
+        answer_text = clean_answer(
+            answer_text,
+            single_line=getattr(settings, "answer_single_line", False)
+        )
         payload = {
             "answer": answer_text,
             "meta": {
                 "cached": False,
-                "context_preview": context[:240],
+                "context_preview": squash_whitespace(context)[:240],
                 "sources": [
                     {
                         "id": c["id"],
