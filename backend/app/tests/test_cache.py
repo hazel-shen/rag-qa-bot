@@ -29,6 +29,7 @@ def test_cache_hit_same_query_same_setting(client, mocker):
     assert r2.status_code == 200
     assert r2.json()["meta"]["cached"] is True
 
+#TODO
 @pytest.mark.xfail(reason="目前 cache key 未納入設定；待 _cache_key_for_query 納入 top_k/chat_model 後再啟用")
 def test_cache_miss_when_setting_changes(client, mocker, monkeypatch):
     # 第一次用預設 TOP_K
