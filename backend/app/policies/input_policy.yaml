@@ -1,0 +1,61 @@
+# policy_version: 用於回應 meta 與審計
+policy_version: "2025-09-22-1700"
+
+length:
+  # 單次輸入最大字元數（UTF-8）
+  max_chars: 2000
+  # 可選：模型前計算 token 上限（沒在程式端計算就先忽略）
+  max_input_tokens: 1024
+
+format:
+  # 僅允許純文字
+  allowed_content_types: ["text/plain"]
+  # 移除或直接拒絕含 HTML/script 片段的輸入
+  strip_html: true
+  # 遇到明顯 code block / shell 指令片段直接拒絕
+  reject_code_blocks: true
+
+blacklist:
+  # 直覺關鍵字（大小寫不敏感建議轉小寫比對）
+  blocked_keywords:
+    - "drop table"
+    - "union select"
+    - "insert into"
+    - "/etc/passwd"
+    - "--data-binary @"
+    - "127.0.0.1"
+    - "169.254.169.254"
+  # 常見危險樣式：內網/IMDS/檔案協定/命令鏈等（使用程式端預編譯）
+  blocked_regex:
+    - "(?i)\\b(127\\.0\\.0\\.1|localhost|0\\.0\\.0\\.0)\\b"
+    - "(?i)http://169\\.254\\.169\\.254(/.*)?"
+    - "(?i)file://.+"
+    - "(?i)ssh://.+"
+    - "(?i)smb://.+"
+    - "(?i)(;|\\|\\||&&)"
+
+url:
+  allow_urls: false
+  # 若 allow_urls=true，僅允許白名單
+  url_whitelist: [] # 例如 ["https://docs.example.com"]
+
+roles:
+  # 角色白名單規則（示例）
+  role_whitelist:
+    employee:
+      allow_internal_topics: true
+    guest:
+      allow_internal_topics: false
+
+rate_limit:
+  per_ip_per_min: 30
+  per_user_per_min: 60
+  burst: 10
+
+response:
+  # 打碼規則：遇到疑似秘密（API Key/Token/密碼）要遮罩
+  redact_patterns:
+    - "(?i)api[_-]?key\\s*[:=]\\s*([A-Za-z0-9_-]{12,})"
+    - "(?i)bearer\\s+[A-Za-z0-9._-]{10,}"
+  # 回應只回類型，不回具體規則字串
+  return_violation_details: "minimal"

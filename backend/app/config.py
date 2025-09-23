@@ -18,5 +18,11 @@ class Settings(BaseModel):
     top_k: int = int(os.getenv("TOP_K", "3"))
     max_context_chars: int = int(os.getenv("MAX_CONTEXT_CHARS", "1800"))
     answer_max_tokens: int = int(os.getenv("ANSWER_MAX_TOKENS", "400"))
+    # === Rate Limit 相關 ===
+    rate_limit_per_ip_per_min: int = int(os.getenv("RATE_LIMIT_PER_IP_PER_MIN", "30"))
+    rate_limit_per_user_per_min: int = int(os.getenv("RATE_LIMIT_PER_USER_PER_MIN", "60"))
+    rate_limit_burst: int = int(os.getenv("RATE_LIMIT_BURST", "10"))
+    disable_rate_limit: bool = bool(int(os.getenv("DISABLE_RATE_LIMIT", "0")))
 
+    env: str = os.getenv("APP_ENV", "production")
 settings = Settings()

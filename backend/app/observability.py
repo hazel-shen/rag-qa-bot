@@ -1,6 +1,6 @@
 # app/observability.py
 # app/observability.py
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Histogram, Gauge
 
 # 請求層級
 REQUEST_COUNT = Counter(
@@ -66,3 +66,56 @@ ERROR_COUNT = Counter(
     "Errors by stage",
     ["stage"]  # stage: cache|embedding|retrieval|rerank|llm|route
 )
+
+# Input policy metrics
+input_rejected_total = Counter(
+    "input_rejected_total",
+    "Total rejected inputs by type",
+    ["type"],  # length|format|keyword|regex|url|role
+)
+
+input_rate_limited_total = Counter(
+    "input_rate_limited_total",
+    "Total rate-limited requests by scope",
+    ["scope"],  # ip|user
+)
+
+input_accepted_total = Counter(
+    "input_accepted_total",
+    "Total accepted inputs",
+)
+
+input_chars_histogram = Histogram(
+    "input_chars_histogram",
+    "Histogram of input length in characters",
+    buckets=(50, 100, 200, 400, 800, 1200, 1600, 2000, 3000, 5000),
+)
+
+# 若目前暫不計算 tokens，也可以保留但先不呼叫
+input_tokens_histogram = Histogram(
+    "input_tokens_histogram",
+    "Histogram of input length in tokens",
+    buckets=(64, 128, 256, 512, 768, 1024, 1536, 2048),
+)
+
+input_violation_last_seen_timestamp = Gauge(
+    "input_violation_last_seen_timestamp",
+    "Epoch seconds of last seen violation for a given type",
+    ["type"],
+)
+
+# --- 便捷記錄函式（給 security.py / routes.py 呼叫） ---
+def record_accept(len_chars: int, len_tokens: int | None = None) -> None:
+    input_accepted_total.inc()
+    if len_chars is not None:
+        input_chars_histogram.observe(len_chars)
+    if len_tokens is not None:
+        input_tokens_histogram.observe(len_tokens)
+
+def record_reject(reject_type: str) -> None:
+    input_rejected_total.labels(reject_type).inc()
+    import time as _t
+    input_violation_last_seen_timestamp.labels(reject_type).set(int(_t.time()))
+
+def record_throttle(scope: str) -> None:
+    input_rate_limited_total.labels(scope).inc()

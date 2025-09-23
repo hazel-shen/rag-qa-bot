@@ -12,6 +12,7 @@ dependencies:
   - lxml
   - beautifulsoup4
   - conda-forge::faiss-cpu # 🔒 強制從 conda-forge 裝 faiss-cpu
+  - pyyaml
   - pip:
       - fastapi
       - uvicorn
