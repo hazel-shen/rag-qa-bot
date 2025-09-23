@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+  external_labels:
+    env: "dev"
+    service: "faq-bot"
+
+scrape_configs:
+  # 抓取 Prometheus 自己
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # 抓取本機後端（請確保後端跑在宿主機 8000）
+  # 若後端也在 docker 內，請改成容器內可達的服務名稱與埠。
+  - job_name: "faq-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+    relabel_configs:
+      - target_label: job
+        replacement: "faq-backend-dev"
+# ===== （可選）送到 Grafana Cloud：取消註解後填入你的資訊 =====
+# remote_write:
+#   - url: https://prometheus-<stack-id>.grafana.net/api/prom/push
+#     basic_auth:
+#       username: "<instance id or user>"
+#       password: "<grafana cloud api key>"
+#     write_relabel_configs:
+#       - source_labels: [job]
+#         target_label: job
+#         replacement: "faq-backend-dev"

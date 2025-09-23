@@ -1,0 +1,268 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Request Overview",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "RPS (requests/sec)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 6 },
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_requests_total[1m]))",
+          "legendFormat": "rps",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "p95 Latency (s) by route",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 6, "y": 1, "w": 18, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(llm_request_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Cache & Cost",
+      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Cache Hit / Miss (per min)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (result) (increase(rag_cache_results_total[5m]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Cost Rate (USD/min) by model",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } },
+      "targets": [
+        {
+          "expr": "sum by (model) (rate(llm_cost_total_usd_total[1m])) * 60",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Tokens & Errors",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Tokens/sec by kind & model",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (kind, model) (rate(llm_tokens_total[1m]))",
+          "legendFormat": "{{kind}} {{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Errors (5m increase) by stage",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (stage) (increase(rag_errors_total[5m]))",
+          "legendFormat": "{{stage}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "RAG Pipeline Latency",
+      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Embedding Latency p95 (s) by stage",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 0, "y": 22, "w": 8, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(rag_embedding_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{stage}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Retrieval Latency p95 (s)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 8, "y": 22, "w": 8, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(rag_retrieval_latency_seconds_bucket[5m])))",
+          "legendFormat": "retrieval",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Rerank Latency p95 (s)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 16, "y": 22, "w": 8, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(rag_rerank_latency_seconds_bucket[5m])))",
+          "legendFormat": "rerank",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "LLM Latency p95 (s) by model",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(rag_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Input Health",
+      "gridPos": { "x": 0, "y": 34, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Rejected Inputs (5m) by type",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 0, "y": 35, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (type) (increase(input_rejected_total[5m]))",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Rate Limited (5m) by scope",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 8, "y": 35, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (scope) (increase(input_rate_limited_total[5m]))",
+          "legendFormat": "{{scope}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Accepted Inputs (5m)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "x": 16, "y": 35, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "increase(input_accepted_total[5m])",
+          "legendFormat": "accepted",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["faq-bot", "rag", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "FAQ Bot — Overview (RAG + LLM)",
+  "version": 1,
+  "weekStart": ""
+}

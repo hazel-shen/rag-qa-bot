@@ -1,5 +1,4 @@
 # app/observability.py
-# app/observability.py
 from prometheus_client import Counter, Histogram, Gauge
 
 # 請求層級
