@@ -27,11 +27,12 @@ def _estimate_cost(model: str, in_tokens: int, out_tokens: int) -> float:
 def answer_with_context(query: str, context: str) -> Dict[str, Any]:
     client = _client_lazy()
     system = (
-        "請用繁體中文回答，直接給出重點與步驟。"
-        "不要加開場白或結語，不要出現「以下」「如下」等過場詞。"
+        "請用繁體中文回答。"
+        "答案必須只用一句完整的句子表達。"
+        "不要加開場白或結語，不要使用條列符號，不要多段落。"
         "不要在答案中附加任何來源或 (source: ...)，來源由系統在 meta 中提供。"
-        "若需要列點，最多 5 點，避免重複同義句。"
-        "若資訊不足，請坦承不足。"
+        "若答案涉及端點/指標/模型名，請原樣輸出（大小寫與符號不改），多個項目以「、」分隔。"
+        "若資訊不足，請直接回答「資訊不足」。"
     )
     user = f"問題：{query}\n\n已檢索到的相關內容：\n{context}"
 
