@@ -1,37 +1,98 @@
+# app/tests/conftest.py
 import os
 import pytest
 from fastapi.testclient import TestClient
-from starlette.testclient import TestClient
 from app.rate_limit import rate_limiter
-from app.main import app
 from app.cache import result_cache
+import app.config as config
 
-rate_limiter.reset_buckets()
-# 預設一個 fake key，避免 mock 測試爆掉
-os.environ.setdefault("OPENAI_API_KEY", "sk-test-fake")
+# ⚠️ 不要在全域就塞假金鑰，避免 e2e 無法正確 skip
+# os.environ.setdefault("OPENAI_API_KEY", "sk-test-fake")
 
+# 0) 只有「一般單元測試」才補假金鑰；e2e / eval 一律不補
+@pytest.fixture(autouse=True)
+def _fake_key_for_unit_tests(request, monkeypatch):
+    if request.node.get_closest_marker("e2e") or request.node.get_closest_marker("eval"):
+        return
+    # 若外部未設定，才補上假的
+    if not os.environ.get("OPENAI_API_KEY"):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
+
+
+# 1) 測試用 TestClient
 @pytest.fixture
 def client():
+    from app.main import app
     return TestClient(app)
 
 @pytest.fixture
 def client_no_raise():
+    from app.main import app
     return TestClient(app, raise_server_exceptions=False)
 
+
+# 2) 全域打樁：避免打到 OpenAI（必要）
+#    但若 RAG_DISABLE_STUB=1 或者 test 有 @pytest.mark.eval / @pytest.mark.e2e，就完全不打樁
+@pytest.fixture(autouse=True)
+def _stub_llm(monkeypatch, request):
+    if (
+        os.environ.get("RAG_DISABLE_STUB") == "1"
+        or request.node.get_closest_marker("eval")
+        or request.node.get_closest_marker("e2e")
+    ):
+        return
+
+    # ---- eval-like 離線檢索回答（不打外部 API）----
+    def retrieval_only_answer(query, context):
+        texts = []
+        if isinstance(context, (list, tuple)):
+            for c in context:
+                t = c.get("text") if isinstance(c, dict) else (str(c) if c is not None else "")
+                if t:
+                    texts.append(t)
+        blob = "\n".join(texts)
+
+        import re
+        def _norm(s): return re.sub(r"\s+", "", (s or "")).lower()
+        q = _norm(query)
+        best = ""
+        best_score = -1
+        for seg in re.split(r"(?<=[。.!?？])\s+", blob) if blob else []:
+            s = _norm(seg)
+            score = len(set(q) & set(s))
+            if score > best_score:
+                best_score, best = score, seg
+        text = (best or texts[0] if texts else "")[:400]
+        return {"text": text, "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}, "cost_usd": 0.0}
+
+    monkeypatch.setattr("app.llm.answer_with_context", retrieval_only_answer, raising=False)
+
+    # 若你的 reranker 也會呼叫雲端，保留原本的假 rerank（或自行移除）
+    try:
+        def fake_rerank(query, cands):
+            for i, c in enumerate(cands):
+                c["reranker_score"] = 1.0 - i * 0.01
+            return cands[:]
+        monkeypatch.setattr("app.reranker.rerank", fake_rerank, raising=False)
+    except Exception:
+        pass
+
+
+# 3) 一般測試：放寬限流（自動套用）
 @pytest.fixture(autouse=True)
 def _relax_rate_limit_for_tests():
-    rate_limiter.configure(per_ip_per_min=10_000, per_user_per_min=10_000, burst=10_000)
-    rate_limiter._ip_buckets.clear()
-    rate_limiter._user_buckets.clear()
+    rate_limiter.configure(per_ip_per_min=10_000, per_user_per_min=10_000, burst=10_000, disabled=False)
+    rate_limiter.reset_buckets()
     yield
+    rate_limiter.reset_buckets()
 
+
+# 4) 每個測試前後清空快取
 @pytest.fixture(autouse=True)
 def _clear_cache_between_tests():
-    # 若你的 result_cache 沒有 clear()，請看下方「補一個 clear()」
     try:
         result_cache.clear()
     except AttributeError:
-        # fallback：常見簡易快取都用 dict-like 實作，可加一個屬性或方法
         if hasattr(result_cache, "store") and isinstance(result_cache.store, dict):
             result_cache.store.clear()
     yield
@@ -41,3 +102,22 @@ def _clear_cache_between_tests():
         if hasattr(result_cache, "store") and isinstance(result_cache.store, dict):
             result_cache.store.clear()
 
+
+# 5) 需要「真的測限流」時使用這個 fixture（在測試函式參數列出）
+@pytest.fixture
+def enable_real_rate_limit():
+    old_env = getattr(config.settings, "env", "")
+    old_disable = getattr(config.settings, "disable_rate_limit", False)
+
+    # 讓 routes._skip_rate_limit() 不跳過
+    config.settings.env = "dev"              # 不要是 "test"
+    config.settings.disable_rate_limit = False
+
+    # 設定小額度以便觸發 429
+    rate_limiter.configure(per_ip_per_min=1, per_user_per_min=1, burst=1, disabled=False)
+    rate_limiter.reset_buckets()
+    yield
+    # 還原
+    config.settings.env = old_env
+    config.settings.disable_rate_limit = old_disable
+    rate_limiter.reset_buckets()

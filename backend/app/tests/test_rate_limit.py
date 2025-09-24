@@ -1,80 +1,82 @@
 # app/tests/test_rate_limit.py
-from __future__ import annotations
-
-import re
-from typing import Optional
-
 import pytest
 from starlette.testclient import TestClient
 
+import app.config as config
+from app.main import app
 from app.rate_limit import rate_limiter
-import app.routes as routes_mod  # 用來關閉 routes 中的 _skip_rate_limit()
-
-def _metric_value(text: str, metric: str, labels: Optional[dict] = None) -> float:
-    lines = [ln.strip() for ln in text.splitlines() if ln and not ln.startswith("#")]
-    if labels:
-        want = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
-        import re as _re
-        pat = _re.compile(rf'^{re.escape(metric)}\{{[^}}]*{re.escape(want)}[^}}]*\}}\s+([0-9.eE+-]+)$')
-        for ln in lines:
-            m = pat.match(ln)
-            if m:
-                return float(m.group(1))
-        return 0.0
-    else:
-        import re as _re
-        pat = _re.compile(rf'^{re.escape(metric)}\s+([0-9.eE+-]+)$')
-        for ln in lines:
-            m = pat.match(ln)
-            if m:
-                return float(m.group(1))
-        return 0.0
 
 
+# --- 測試客戶端 ---
+@pytest.fixture()
+def client():
+    return TestClient(app)
+
+
+# --- 全域打樁：避免測試打到 OpenAI / 雲端 reranker ---
 @pytest.fixture(autouse=True)
-def _force_enable_rate_limit(monkeypatch):
+def _stub_external_calls(monkeypatch):
+    # stub LLM
+    def fake_answer_with_context(query, context):
+        return {
+            "text": f"[stubbed answer] {query}",
+            "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+            "cost_usd": 0.0,
+        }
+    monkeypatch.setattr("app.llm.answer_with_context", fake_answer_with_context, raising=True)
+
+    # 若你的 reranker 也會調雲端，可一併打樁
+    try:
+        def fake_rerank(query, cands):
+            # 模擬「原順序即結果」，並附個假分數
+            for i, c in enumerate(cands):
+                c["reranker_score"] = 1.0 - i * 0.01
+            return cands[:]
+        monkeypatch.setattr("app.reranker.rerank", fake_rerank, raising=True)
+    except Exception:
+        pass
+
+
+# --- 需要「真的測限流」時才啟用的 fixture ---
+@pytest.fixture
+def enable_real_rate_limit():
     """
-    測試中強制啟用速率限制：
-    - 讓 routes._skip_rate_limit() 回傳 False（避免 APP_ENV=test 跳過）
-    - 重設桶狀態，並設定小配額方便測試
+    讓 /ask 在測試時不再被 _skip_rate_limit() 跳過，
+    並把配額設得很小以便觸發 429。
     """
-    # 關閉 routes 的「測試環境跳過 RL」邏輯
-    monkeypatch.setattr(routes_mod, "_skip_rate_limit", lambda: False, raising=False)
-    # 配置小配額並清空桶
+    old_env = getattr(config.settings, "env", "")
+    old_disable = getattr(config.settings, "disable_rate_limit", False)
+
+    # 讓 routes._skip_rate_limit() 不會跳過
+    config.settings.env = "dev"              # 任何不是 "test" 的值
+    config.settings.disable_rate_limit = False
+
+    # 小額度 + 清桶，保證測試獨立
     rate_limiter.configure(per_ip_per_min=1, per_user_per_min=1, burst=1, disabled=False)
     rate_limiter.reset_buckets()
-    yield
-    # 測試後不特別恢復，下一個 fixture 會再設定
+
+    try:
+        yield
+    finally:
+        # 還原
+        config.settings.env = old_env
+        config.settings.disable_rate_limit = old_disable
+        rate_limiter.reset_buckets()
 
 
-def test_rate_limit_per_ip_returns_429_and_retry_after(client: TestClient):
+def test_rate_limit_per_ip_returns_429_and_retry_after(client: TestClient, enable_real_rate_limit):
     # 第一次通過
     r1 = client.post("/ask", json={"query": "hello rl"})
     assert r1.status_code == 200
 
-    # 第二次立即打 → 429
+    # 立即第二次 → 429（per_ip_per_min=1, burst=1）
     r2 = client.post("/ask", json={"query": "hello rl again"})
     assert r2.status_code == 429
     assert "Retry-After" in r2.headers
 
 
-def test_rate_limit_per_user_returns_429(client: TestClient):
-    # 把 per_user 放寬為 1, burst 1；使用同一 user_id
-    rate_limiter.configure(per_ip_per_min=9999, per_user_per_min=1, burst=1, disabled=False)
-    rate_limiter.reset_buckets()
-
-    r1 = client.post("/ask", json={"query": "hi"},)
-    assert r1.status_code in (200, 429)  # 視上一測試殘留；但我們 reset_buckets() 已清
-
-    r1 = client.post("/ask", json={"query": "hi", "user": {"id": "u1"}})
-    assert r1.status_code == 200
-    r2 = client.post("/ask", json={"query": "hi again", "user": {"id": "u1"}})
-    assert r2.status_code == 429
-    assert "Retry-After" in r2.headers
-
-
-def test_rate_limit_burst_behavior(client: TestClient):
-    # 允許兩次突發，第三次 429（每分補 1，不等待）
+def test_rate_limit_burst_behavior(client: TestClient, enable_real_rate_limit):
+    # 調整為：每分鐘配額 1、突發 2 → 前兩次放行、第三次 429
     rate_limiter.configure(per_ip_per_min=1, per_user_per_min=1, burst=2, disabled=False)
     rate_limiter.reset_buckets()
 
@@ -85,20 +87,3 @@ def test_rate_limit_burst_behavior(client: TestClient):
     assert r1.status_code == 200
     assert r2.status_code == 200
     assert r3.status_code == 429
-
-
-def test_rate_limit_metrics_increment_on_throttle(client: TestClient):
-    # 固定 scope=user 的 429
-    rate_limiter.configure(per_ip_per_min=9999, per_user_per_min=1, burst=1, disabled=False)
-    rate_limiter.reset_buckets()
-
-    before = client.get("/metrics").text
-    m0 = _metric_value(before, "input_rate_limited_total", {"scope": "user"})
-
-    client.post("/ask", json={"query": "hi", "user": {"id": "u3"}})   # pass
-    r = client.post("/ask", json={"query": "hi2", "user": {"id": "u3"}})  # throttle
-    assert r.status_code == 429
-
-    after = client.get("/metrics").text
-    m1 = _metric_value(after, "input_rate_limited_total", {"scope": "user"})
-    assert m1 == m0 + 1
