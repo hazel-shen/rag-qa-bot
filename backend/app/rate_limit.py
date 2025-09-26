@@ -99,7 +99,9 @@ class RateLimiter:
             ok, wait = b_user.take(1)
             if not ok:
                 return RateLimitDecision(False, scope="user", retry_after_sec=wait)
+            return RateLimitDecision(True)
 
+        # 沒帶 user id 才落回 IP 桶
         if ip:
             b_ip = self._get_bucket(self._ip_buckets, ip, self._per_ip_per_min)
             ok, wait = b_ip.take(1)
