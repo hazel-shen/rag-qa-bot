@@ -11,6 +11,10 @@ on:
         description: "Skip build and only deploy existing image (true/false)"
         required: true
         default: "false"
+      app_env:
+        description: "APP_ENV for deployment (prod/staging/dev)"
+        required: true
+        default: "prod"
 
 jobs:
   build-push:
@@ -34,9 +38,6 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
 
       # 計算 GHCR image 路徑（全小寫）
       - name: Compute image refs (lowercase)
@@ -113,6 +114,8 @@ jobs:
           GHCR_SECRET_ARN: ${{ secrets.GHCR_SECRET_ARN }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          APP_ENV: ${{ github.event.inputs.app_env }}
+          AWS_SECRETS_ID: ${{ secrets.AWS_SECRETS_ID }}
         run: |
           # base64 編碼腳本內容，避免多層引號問題
           B64=$(base64 -w0 ops/deploy_container.sh)
@@ -126,7 +129,7 @@ jobs:
               \"set -euo pipefail\",
               \"echo '${B64}' | base64 -d > /tmp/deploy.sh\",
               \"chmod +x /tmp/deploy.sh\",
-              \"bash /tmp/deploy.sh '${IMAGE}' '${CONTAINER_NAME}' '${GHCR_SECRET_ARN}' '${GHCR_USERNAME}'\"
+              \"bash /tmp/deploy.sh '${IMAGE}' '${CONTAINER_NAME}' '${GHCR_SECRET_ARN}' '${GHCR_USERNAME}' '${APP_ENV}' '${AWS_SECRETS_ID}'\"
             ]" \
           )
           # 抓取 CommandId 以便後續查詢

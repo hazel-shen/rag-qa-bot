@@ -1,4 +1,4 @@
-# 基本
+# === 基本套件 ===
 numpy
 pydantic>=2,<3
 python-dotenv
@@ -10,24 +10,24 @@ pyyaml
 redis
 torch
 
-# Web & API
+# === Web & API ===
 fastapi
 uvicorn
 prometheus-client
 openai>=1.45
 sentence-transformers
 
-# 文件解析
+# === 文件解析 ===
 python-docx
 markdown-it-py
 pymupdf
 
-# 測試
+# === 測試 ===
 pytest
 pytest-mock
 
-# AWS Secrets Manager
-boto3
+# === AWS ===
+boto3  # AWS SDK (Secrets Manager 用)
 
-# 生產用
+# === 生產環境 ===
 gunicorn

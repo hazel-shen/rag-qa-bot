@@ -41,16 +41,7 @@ EXPOSE 8080
 
 # ── 健康檢查 ─────────────────────────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-  CMD python - <<'PY' || exit 1
-import urllib.request, os, sys
-port=os.getenv("PORT","8080")
-path=os.getenv("HEALTH_PATH","/healthz")
-try:
-    with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=2) as r:
-        sys.exit(0 if r.status==200 else 1)
-except Exception:
-    sys.exit(1)
-PY
+  CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-8080}${HEALTH_PATH:-/healthz}" || exit 1'
 
 # ── Gunicorn + UvicornWorker 啟動 ────────────────────────────────────────────
 CMD ["bash","-lc","exec gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS:-2} -b 0.0.0.0:${PORT:-8080} app.main:app --log-level ${LOG_LEVEL:-info}"]
