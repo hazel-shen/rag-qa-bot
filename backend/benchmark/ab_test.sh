@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# ab_test.sh
+# 用途：用 ApacheBench 來做壓力測試。
 set -euo pipefail
 
 URL="${URL:-http://127.0.0.1:8000/ask}"

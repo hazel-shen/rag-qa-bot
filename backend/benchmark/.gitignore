@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Shell script log/output
+*.log
+
+# Benchmark generated CSV/JSON/JSONL results
+*.csv
+*.json
+*.jsonl
+
+# Ignore only generated benchmark results, keep queries
+!bench_queries.txt
+!cost_queries.txt
+
+# Locust report artifacts
+locust-*.html
+
+# 測試問題集
+cost_queries.txt
+bench_queries.txt
