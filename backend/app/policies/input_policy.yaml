@@ -19,6 +19,7 @@ blacklist:
   # 直覺關鍵字（大小寫不敏感建議轉小寫比對）
   blocked_keywords:
     - "drop table"
+    - "1 OR 1=1"
     - "union select"
     - "insert into"
     - "/etc/passwd"
