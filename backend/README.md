@@ -11,37 +11,18 @@
 ## 📂 專案結構
 
 ```yaml
-.
-├── backend/
-│   ├── environment.yml       # Conda 環境
-│   ├── Dockerfile            # 容器化 (Micromamba)
-│   ├── app/
-│   │   ├── main.py           # FastAPI 入口
-│   │   ├── routes.py         # API routes (/ask, /healthz)
-│   │   ├── security.py       # 基礎防護
-│   │   ├── observability.py  # Prometheus 指標
-│   │   ├── cache.py          # 結果快取
-│   │   ├── retrieval.py      # FAISS 檢索
-│   │   ├── reranker.py       # 文件重排
-│   │   ├── llm.py            # OpenAI Chat 回答 + 成本統計
-│   │   ├── config.py         # 設定 (環境變數)
-│   │   └── ingest/           # 清洗 + 切片模組
-│   │       ├── loaders.py
-│   │       ├── cleaning.py
-│   │       ├── chunking.py
-│   │       └── cli_ingest.py
-│   └── data/
-│       ├── raw/              # 原始文件 (pdf/docx/html/md/txt)
-│       ├── clean/            # 清洗 + 切片後輸出 (chunks.jsonl)
-│       ├── docs/             # 快速模式文件 (txt/md)
-│       ├── index.faiss       # FAISS 索引 (build 後產出)
-│       └── docstore.jsonl    # 文件中繼資料 (build 後產出)
-├── frontend/                 # 前端 (簡單網頁)
-│   └── index.html
-├── benchmark/                # 壓測腳本 (ab/locust)
-├── ops/                      # 部署腳本
-│   └── deploy_container.sh
-└── pytest.ini                # 測試標記設定
+./
+├── backend/                        # 後端服務 (FastAPI + RAG pipeline)
+│ ├── app/                          # 核心程式碼 (檢索、重排序、快取、防護、API)
+│ ├── data/                         # 測試/開發用資料 (raw / clean / docs)
+│ ├── benchmark/                    # 壓測腳本 (ab / locust)
+│ └── tests/                        # 測試案例 (pytest)
+├── frontend/                       # 前端靜態頁面 (index.html + JS + CSS)
+├── observability/                  # 監控配置 (Prometheus + Grafana)
+├── cloudflare_worker_api_proxy/    # Cloudflare Worker Proxy
+├── ops/                            # 部署腳本
+├── docker-compose.yml              # 本地開發編排
+└── README.md                       # 專案說明文件
 ```
 
 ## 🚀 安裝與環境
@@ -68,13 +49,15 @@ ANSWER_MAX_TOKENS=400
 
 ## 🔧 文件清洗 & 切片
 
-把原始文件放進 backend/data/raw/（支援 .pdf/.docx/.html/.md/.txt）
-清洗 + 切片：
+把原始文件放進 `backend/data/raw/`（支援 .pdf/.docx/.html/.md/.txt）。
+這些檔案會先經過 Loader，依副檔名選擇對應的解析方式（例如 PDF 用 PyMuPDF，DOCX 用 python-docx，HTML 用 BeautifulSoup），最後統一轉換成純文字，再進行清洗與切片。
+
+執行：
 
 ```bash
 python -m app.ingest.cli_ingest \
-  --input backend/data/raw \
-  --out backend/data/clean/chunks.jsonl
+  --input ./data/raw \
+  --out ./data/clean/chunks.jsonl
 ```
 
 輸出：
@@ -96,13 +79,16 @@ backend/data/clean/chunks.jsonl → 切片後的語料
 快速模式：
 
 ```bash
-python -m app.build_index --docs backend/data/docs
+python -m app.build_index --docs ./data/docs
 ```
 
 完整模式：
 
 ```bash
-python -m app.build_index --chunks backend/data/clean/chunks.jsonl
+python -m app.build_index \
+  --chunks ./data/clean/chunks.jsonl \
+  --docstore ./data/docs/docstore.jsonl \
+  --index ./data/docs/index.faiss
 ```
 
 ## 🏃‍♂️ 啟動服務
@@ -158,30 +144,17 @@ pytest -m e2e -v
 pytest -m perf -v
 ```
 
-## 📊 指標 (Prometheus)
+回答品質測試（打真的 OpenAI API，有成本 ⚠️）：
 
-| 分類         | 指標                                                                                                                                                                 | 說明                 |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Runtime      | `python_gc_*`, `python_info`                                                                                                                                         | Python GC 與版本資訊 |
-| 請求         | `llm_requests_total`, `llm_request_latency_seconds`                                                                                                                  | 請求數、延遲統計     |
-| Token/成本   | `llm_tokens_total`, `llm_cost_total_usd_total`                                                                                                                       | Token 使用量與成本   |
-| Cache        | `rag_cache_requests_total`, `rag_cache_results_total`                                                                                                                | Cache 查詢與命中率   |
-| RAG Pipeline | `rag_embedding_latency_seconds`, `rag_retrieval_latency_seconds`, `rag_rerank_latency_seconds`, `rag_llm_latency_seconds`, `rag_errors_total`                        | 各階段延遲與錯誤     |
-| Input Policy | `input_accepted_total`, `input_rejected_total`, `input_rate_limited_total`, `input_chars_histogram`, `input_tokens_histogram`, `input_violation_last_seen_timestamp` | 輸入檢查與限流統計   |
+```bash
+pytest -m eval -s -vv
+```
 
 ## 🛡️ 安全防護
 
 - 阻擋內網 URL（127.0.0.1 / localhost）
 - SQL Injection 關鍵字過濾
 - 輸入長度限制
-
-## ✅ 驗收標準 (Day02)
-
-- 延遲：p95 ≤ 3 秒
-- 吞吐量：QPS ≥ 3
-- 正確性：FAQ 問答正確率達基本要求
-
-目前已達成 Demo 驗收條件。
 
 ## 🎯 功能特色
 
@@ -193,10 +166,9 @@ pytest -m perf -v
 
 ## 🔄 待辦 (未來)
 
-- Redis 快取
-- 回答格式改善 (Day2 驗收)
-- 加上使用者介面 (Day2 驗收)
-- Metrics 傳到本機的 Grafana 並且可以畫圖 (Day2 驗收)
+- 壓測數據（證明 p95 ≤3s、QPS ≥3）(Day02)
+- 正確性檢查（用一小份 dataset 驗證回答合理性）-> 做完了，可是準率可以更好
+- 實作員工/部門？
 - 更進階的清洗/切片策略
 - Citation 格式化
 - CI/CD 自動建索引與部署
