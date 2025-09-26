@@ -45,3 +45,6 @@ index/
 *.npy
 *.pt
 *.bin
+
+# 驗收過程的產物
+bench_queries.txt

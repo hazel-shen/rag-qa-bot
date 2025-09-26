@@ -1,0 +1,65 @@
+version: "3.9"
+
+name: RAG-QA-BOT
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prom
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./dashboards:/var/lib/grafana/dashboards/seed:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # redis_exporter:
+  #   image: oliver006/redis_exporter:v1.62.0
+  #   container_name: redis_exporter
+  #   environment:
+  #     # 如果 redis 跟 exporter 在同個 compose 網路，用 service 名稱即可
+  #     - REDIS_ADDR=redis://redis:6379
+  #     # 若你的 redis 有密碼，改用：redis://:password@redis:6379
+  #     # 若有多個 Redis，可參考 REDIS_ADDRS 或 use-keys exporter flags
+  #   ports:
+  #     - "9121:9121"
+  #   depends_on:
+  #     - redis
+  #   restart: unless-stopped
+
+volumes:
+  prom_data:
+    name: observability_prom_data
+  grafana_data:
+    name: observability_grafana_data
+  redis_data:
+    name: observability_redis_data

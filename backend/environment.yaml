@@ -13,11 +13,14 @@ dependencies:
   - beautifulsoup4
   - conda-forge::faiss-cpu # 🔒 強制從 conda-forge 裝 faiss-cpu
   - pyyaml
+  - redis
+  - pytorch
   - pip:
       - fastapi
       - uvicorn
       - prometheus-client
-      - openai>=1.42.0
+      - openai>=1.45
+      - sentence-transformers
       - python-docx # 解析 DOCX
       - markdown-it-py # Markdown 轉純文字（可選）
       - pymupdf # PDF 解析 (PyMuPDF, pip 專用)
