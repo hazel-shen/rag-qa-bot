@@ -1,2 +1,33 @@
-fastapi==0.115.0
-uvicorn==0.30.6
+# 基本
+numpy
+pydantic>=2,<3
+python-dotenv
+tqdm
+lxml
+beautifulsoup4
+faiss-cpu
+pyyaml
+redis
+torch
+
+# Web & API
+fastapi
+uvicorn
+prometheus-client
+openai>=1.45
+sentence-transformers
+
+# 文件解析
+python-docx
+markdown-it-py
+pymupdf
+
+# 測試
+pytest
+pytest-mock
+
+# AWS Secrets Manager
+boto3
+
+# 生產用
+gunicorn
