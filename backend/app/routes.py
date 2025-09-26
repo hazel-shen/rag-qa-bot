@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import time
-import hashlib
 from uuid import uuid4
 from typing import Any, Dict, List, Tuple
 
@@ -19,7 +18,7 @@ from .observability import (
     RETRIEVAL_LATENCY, LLM_LATENCY, ERROR_COUNT,
     RERANK_LATENCY, record_throttle
 )
-from .cache import result_cache
+from .cache import build_cache_key, cache_get, cache_set
 from .config import settings
 from . import retrieval, llm
 
@@ -58,8 +57,16 @@ def _error_response(status: int, meta_type: str, req_id: str, policy_version: st
 
 
 def _cache_key_for_query(query: str) -> str:
-    base = f"{query}|{settings.top_k}|{settings.chat_model}|{settings.rerank_model}"
-    return "ask:" + hashlib.sha256(base.encode("utf-8")).hexdigest()
+    # 改為使用統一的 key builder（含 index/model/reranker 版本）
+    return build_cache_key(
+        "answer",
+        query,
+        params={"top_k": settings.top_k},
+        model_version=settings.chat_model,          # ← 實際回覆用的 LLM
+        reranker_version=settings.rerank_model,     # ← 實際使用的 reranker
+        # 如果你有索引版號，也可一併傳：index_version=settings.index_version
+        index_version=getattr(settings, "index_version", "v1"),
+    )
 
 def _skip_rate_limit() -> bool:
     # 若設定檔宣告 env=test，或顯式 disable_rate_limit=True，則跳過
@@ -80,7 +87,7 @@ def _validate_guard(query: str, user_role: str) -> str:
 def _lookup_cache(query: str) -> Dict[str, Any] | None:
     CACHE_REQUESTS.labels(route=_ROUTE).inc()
     ck = _cache_key_for_query(query)
-    cached = result_cache.get(ck)
+    cached = cache_get(ck)
     if cached:
         CACHE_RESULTS.labels(route=_ROUTE, result="hit").inc()
         return cached
@@ -93,16 +100,23 @@ def _retrieve_candidates(query: str, candidate_k: int) -> List[Dict[str, Any]]:
     RETRIEVAL_LATENCY.observe(time.time() - t0)
     return cands
 
-def _rerank_candidates(query: str, cands: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _rerank_candidates(query: str, cands: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], str, str | None]:
     t0 = time.time()
     try:
-        topk = rerank(query, cands)
-    except Exception:
+        res = rerank(query, cands)
+        # 相容兩種簽名：List 或 (List, status[, error])
+        if isinstance(res, tuple):
+            topk = res[0]
+            status = res[1] if len(res) > 1 else "ok"
+            err = res[2] if len(res) > 2 else None
+        else:
+            topk, status, err = res, "ok", None
+    except Exception as e:
         ERROR_COUNT.labels(stage="rerank").inc()
-        topk = cands[:settings.top_k]
+        topk, status, err = cands[:settings.top_k], "fallback", f"{type(e).__name__}: {e}"
     finally:
         RERANK_LATENCY.observe(time.time() - t0)
-    return topk
+    return topk, status, err
 
 def _answer_with_context(query: str, topk: List[Dict[str, Any]]) -> Tuple[str, Dict[str, Any], str]:
     context = retrieval.build_context(topk, settings.max_context_chars)
@@ -113,7 +127,7 @@ def _answer_with_context(query: str, topk: List[Dict[str, Any]]) -> Tuple[str, D
 
 def _write_cache(query: str, payload: Dict[str, Any]):
     ck = _cache_key_for_query(query)
-    result_cache.set(ck, payload)
+    cache_set(ck, payload)
     CACHE_RESULTS.labels(route=_ROUTE, result="write").inc()
 
 
@@ -163,8 +177,9 @@ async def ask(req: Request):
         except _PolicyError as pe:
             return _error_response(pe.http_status, pe.meta_type, req_id, pe.policy_version)
 
-        # 快取
-        cached = _lookup_cache(query)
+        # 快取（可用 ?nocache=1 或 X-Cache-Bypass: 1 跳過）
+        bypass = (req.query_params.get("nocache") == "1") or (req.headers.get("X-Cache-Bypass") == "1")
+        cached = None if bypass else _lookup_cache(query)
         if cached:
             meta = {**cached.get("meta", {}), "cached": True, "policy_version": policy_version, "request_id": req_id}
             return {"answer": cached["answer"], "meta": meta}
@@ -172,7 +187,7 @@ async def ask(req: Request):
         # 檢索 → 重排 → LLM
         candidate_k = max(settings.top_k * 4, 20)
         cands = _retrieve_candidates(query, candidate_k)
-        topk = _rerank_candidates(query, cands)
+        topk, rerank_status, rerank_error = _rerank_candidates(query, cands)
         answer_text, out, context = _answer_with_context(query, topk)
         answer_text = clean_answer(
             answer_text,
@@ -194,6 +209,8 @@ async def ask(req: Request):
                 ],
                 "usage": out["usage"],
                 "cost_usd": out["cost_usd"],
+                "rerank_status": rerank_status,
+                **({"rerank_error": rerank_error} if rerank_status != "ok" and rerank_error else {}),
                 "rerank_model": settings.rerank_model,
                 "top_k": settings.top_k,
                 "policy_version": policy_version,

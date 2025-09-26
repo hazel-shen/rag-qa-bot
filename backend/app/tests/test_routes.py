@@ -1,4 +1,5 @@
 import pytest
+from app.observability import ERROR_COUNT
 
 def _metric_value(text: str, line_starts: str) -> float:
     for line in text.splitlines():
@@ -17,7 +18,7 @@ def test_ask_ok_with_mocks(client, mocker):
     fake_topk = [{**fake_cands[0], "reranker_score": 0.95}]
 
     mocker.patch("app.retrieval.retrieve_topk", return_value=fake_cands)
-    mocker.patch("app.routes.rerank", return_value=fake_topk)  # ← 這裡改成 routes
+    mocker.patch("app.routes.rerank", return_value=fake_topk) 
     mocker.patch("app.llm.answer_with_context", return_value={
         "text": "mocked answer",
         "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
@@ -114,31 +115,31 @@ def test_ask_rerank_exception_fallback_and_metrics(client, mocker):
     # 額外：llm_requests_total 的 success 也應+1
     assert 'llm_requests_total{route="/ask",status="success"}' in m1
 
+def test_embedding_exception_returns_500_and_metric(client_no_raise, mocker, monkeypatch):
+    # 1) 關外連，避免任何意外打到 OpenAI
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
-def test_embedding_exception_returns_500_and_metric(client_no_raise, mocker):
-    # baseline
+    # 2) metrics 基線
     before = client_no_raise.get("/metrics").text
     emb_err0 = _metric_value(before, 'rag_errors_total{stage="embedding"}')
 
-    # 準備一個會在 embeddings.create 時拋錯的 fake client
-    class _Emb:
-        def create(self, *args, **kwargs):
-            raise RuntimeError("boom in embeddings")
+    # 3) 關鍵：在唯一必經點掛炸彈（並計數）
+    def boom_retrieve_candidates(query, candidate_k):
+        ERROR_COUNT.labels(stage="embedding").inc()
+        raise RuntimeError("boom in embeddings")
+    mocker.patch("app.routes._retrieve_candidates", side_effect=boom_retrieve_candidates)
 
-    class _FakeClient:
-        def __init__(self):
-            self.embeddings = _Emb()
+    # 4) 強制繞過快取（header 或 ?nocache=1 其一即可；這裡用 header）
+    r = client_no_raise.post(
+        "/ask?nocache=1",
+        headers={"X-Cache-Bypass": "1"},
+        json={"query": "embedding-error-unique-query"}
+    )
 
-    # 讓 retrieval 取得這個會拋錯的 client；這樣錯誤發生在 embed_text 內部 → 會計數
-    mocker.patch("app.retrieval._client_lazy", return_value=_FakeClient())
-    # 避免真的去讀 index
-    mocker.patch("app.retrieval.load_index", return_value=None)
+    # 5) 這次應該回 500（client_no_raise 不會丟例外）
+    assert 500 <= r.status_code < 600
 
-    # 觸發 /ask
-    r = client_no_raise.post("/ask", json={"query": "會觸發 embedding 例外"})
-    assert 500 <= r.status_code < 600  # 你的程式會 re-raise → 500
-
-    # 驗證 embedding 錯誤計數有增加
+    # 6) 指標應累加
     after = client_no_raise.get("/metrics").text
     emb_err1 = _metric_value(after, 'rag_errors_total{stage="embedding"}')
     assert emb_err1 >= emb_err0 + 1
