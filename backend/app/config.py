@@ -3,8 +3,21 @@ from pydantic import BaseModel
 from dotenv import load_dotenv, find_dotenv
 import os
 
-# 嘗試尋找並載入 .env（例如 backend/.env）
+# 先嘗試尋找並且載入 .env（方便本地 dev）
 load_dotenv(find_dotenv())
+
+# 判斷 APP_ENV
+APP_ENV = os.getenv("APP_ENV", "dev")
+
+# 只有在 prod 環境才去讀 Secrets Manager
+if APP_ENV == "prod" and os.getenv("AWS_SECRETS_ID"):
+    try:
+        from .aws_secrets import load_from_secrets_manager
+        load_from_secrets_manager(os.environ["AWS_SECRETS_ID"])
+    except Exception:
+        # 這裡可加 logger.warning
+        pass
+
 
 class Settings(BaseModel):
     # === OpenAI / 模型 ===
@@ -26,7 +39,7 @@ class Settings(BaseModel):
     answer_single_line: bool = False
     answer_max_tokens: int = int(os.getenv("ANSWER_MAX_TOKENS", "400"))
 
-    # === Rate Limit 相關 ===
+    # === Rate Limit ===
     rate_limit_per_ip_per_min: int = int(os.getenv("RATE_LIMIT_PER_IP_PER_MIN", "30"))
     rate_limit_per_user_per_min: int = int(os.getenv("RATE_LIMIT_PER_USER_PER_MIN", "60"))
     rate_limit_burst: int = int(os.getenv("RATE_LIMIT_BURST", "10"))
@@ -40,6 +53,7 @@ class Settings(BaseModel):
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     
     # === 環境 ===
-    env: str = os.getenv("APP_ENV", "production")
+    env: str = APP_ENV
+
 
 settings = Settings()
