@@ -126,3 +126,14 @@ docker volume rm observability_prom_data observability_grafana_data
 ```
 
 ⚠️ **如果要保留 Grafana 的儀表板配置，不要刪除 `grafana_data` volume。**
+
+## 📊 指標 (Prometheus)
+
+| 分類         | 指標                                                                                                                                                                 | 說明                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Runtime      | `python_gc_*`, `python_info`                                                                                                                                         | Python GC 與版本資訊 |
+| 請求         | `llm_requests_total`, `llm_request_latency_seconds`                                                                                                                  | 請求數、延遲統計     |
+| Token/成本   | `llm_tokens_total`, `llm_cost_total_usd_total`                                                                                                                       | Token 使用量與成本   |
+| Cache        | `rag_cache_requests_total`, `rag_cache_results_total`                                                                                                                | Cache 查詢與命中率   |
+| RAG Pipeline | `rag_embedding_latency_seconds`, `rag_retrieval_latency_seconds`, `rag_rerank_latency_seconds`, `rag_llm_latency_seconds`, `rag_errors_total`                        | 各階段延遲與錯誤     |
+| Input Policy | `input_accepted_total`, `input_rejected_total`, `input_rate_limited_total`, `input_chars_histogram`, `input_tokens_histogram`, `input_violation_last_seen_timestamp` | 輸入檢查與限流統計   |
