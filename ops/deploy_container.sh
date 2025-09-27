@@ -45,6 +45,13 @@ if ! docker run -d --name "$CONTAINER_NAME" \
   -e "PORT=${PORT}" \
   -e "APP_ENV=${APP_ENV}" \
   $( [ -n "$AWS_SECRETS_ID" ] && echo -e "-e AWS_SECRETS_ID=${AWS_SECRETS_ID}" ) \
+  -e "WEB_CONCURRENCY=1" \
+  -e "GUNICORN_CMD_ARGS=--workers 1 --threads 1 --timeout 180 --graceful-timeout 30 --keep-alive 30" \
+  -e "OMP_NUM_THREADS=1" -e "OPENBLAS_NUM_THREADS=1" -e "MKL_NUM_THREADS=1" -e "NUMEXPR_NUM_THREADS=1" \
+  -e "TOKENIZERS_PARALLELISM=false" -e "TORCH_NUM_THREADS=1" \
+  --log-driver json-file \
+  --log-opt max-size=10m \
+  --log-opt max-file=3 \
   "$IMAGE"
 then
   echo "❌ Failed to start new container"
