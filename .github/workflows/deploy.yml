@@ -73,8 +73,12 @@ jobs:
           push: true
           tags: |
             ${{ steps.vars.outputs.TAG_LATEST }}
-          cache-from: type=gha # 使用 GitHub Actions cache 加速 build
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=${{ steps.vars.outputs.TAG_LATEST }}-buildcache
+            type=gha
+          cache-to: |
+            type=registry,ref=${{ steps.vars.outputs.TAG_LATEST }}-buildcache,mode=max
+            type=gha,mode=max
 
   deploy:
     needs: [build-push]

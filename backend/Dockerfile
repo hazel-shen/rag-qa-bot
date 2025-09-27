@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # ── Base ──────────────────────────────────────────────────────────────────────
 FROM python:3.11-slim
 
@@ -19,7 +20,10 @@ RUN groupadd -g $APP_GID appuser && useradd -m -u $APP_UID -g $APP_GID appuser
 
 # 先安裝依賴（仍以 root 進行）
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 使用 BuildKit 的快取掛載，跨 workflow 也能命中；並偏好 wheels
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install -U pip setuptools wheel && \
+    pip install --prefer-binary -r requirements.txt
 
 # 複製程式；可直接用 --chown 減少後續 chown 成本（需要較新 Docker 版本）
 COPY --chown=appuser:appuser app ./app
