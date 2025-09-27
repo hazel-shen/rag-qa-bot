@@ -140,22 +140,33 @@ jobs:
           CMD_ID=$(echo "$RESP" | jq -r '.Command.CommandId')
           echo "command_id=$CMD_ID" >> $GITHUB_OUTPUT
 
-      - name: Wait and show SSM output
+      - name: Wait and show SSM output (manual poll 15m)
         env:
           CMD_ID: ${{ steps.send.outputs.command_id }}
           EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
         run: |
+          set -euo pipefail
           echo "⏳ Waiting for SSM command $CMD_ID to finish ..."
-          for i in {1..12}; do  # 120*5s = 1 分鐘
+
+          ATTEMPTS=90   # 90 * 10s = 900s = 15m
+          DELAY=10
+
+          for ((i=1; i<=ATTEMPTS; i++)); do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$CMD_ID" \
               --instance-id "$EC2_INSTANCE_ID" \
               --query "Status" \
               --output text 2>/dev/null || echo "Pending")
-            echo "Status: $STATUS ($i/120)"
+
+            echo "Status: $STATUS ($i/$ATTEMPTS)"
+
             case "$STATUS" in
-              Success|Failed|Cancelled|TimedOut) break ;;
-              *) sleep 5 ;;
+              Success|Failed|Cancelled|TimedOut)
+                break
+                ;;
+              *)
+                sleep "$DELAY"
+                ;;
             esac
           done
 
