@@ -37,7 +37,14 @@ venv/
 
 # Docker / data volumes
 volumes/
-data/
+
+# RAG intermediate files
+data/clean
+data/docs
+
+# test data
+app/tests/data/eval_small**
+
 
 # build artifacts
 index/
