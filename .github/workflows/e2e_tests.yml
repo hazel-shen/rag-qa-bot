@@ -32,12 +32,18 @@ jobs:
     permissions:
       contents: read
 
+    # 非敏感、穩定的設定直接放這裡（不用再到設定頁面調整）
     env:
       PYTHONUNBUFFERED: "1"
       TOKENIZERS_PARALLELISM: "false"
       TORCH_NUM_THREADS: "1"
       PYTEST_ADDOPTS: "-ra --tb=short"
-      APP_ENV: "test"
+
+      # 應用最小必需
+      INDEX_PATH: data/docs/index.faiss
+      DOCSTORE_PATH: data/docs/docstore.jsonl
+      EMBED_MODEL: text-embedding-3-small # 查詢端 & 建索引一致
+      CACHE_BACKEND: memory # 避免 CI 需要 Redis
 
     steps:
       - name: Checkout ${{ github.event.inputs.branch }}
@@ -52,7 +58,7 @@ jobs:
         with:
           python-version: ${{ github.event.inputs.python_version }}
 
-      # === 套件安裝：與 Unit Tests 完全一致 ===
+      # 套件安裝：與 Unit Tests 完全一致
       - name: Install uv
         run: pip install uv
 
@@ -71,7 +77,19 @@ jobs:
           if [[ -f requirements-dev.txt ]]; then uv pip install -r requirements-dev.txt --system; fi
           if [[ -f pyproject.toml ]]; then uv pip install -e . --system; fi
 
-      # ======== 構建語料 & 索引：先還原快取，沒命中才重建 ========
+      # 提早驗證：沒有 OPENAI_API_KEY 就直接 fail
+      - name: Validate OPENAI_API_KEY
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "::error::Missing OPENAI_API_KEY (set it in Repository secrets)"
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is set (masked)."
+
+      # 構建語料 & 索引：先還原快取，沒命中才重建
       - name: Restore FAISS index cache
         id: faiss-cache-restore
         uses: actions/cache/restore@v4
@@ -80,7 +98,7 @@ jobs:
             ${{ github.event.inputs.project_dir }}/data/clean/chunks.jsonl
             ${{ github.event.inputs.project_dir }}/data/docs/index.faiss
             ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
-          key: faiss-${{ runner.os }}-${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
+          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-${{ env.INDEX_VERSION }}-${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
 
       - name: Verify raw docs exist
         if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
@@ -108,7 +126,6 @@ jobs:
         if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
         working-directory: ${{ github.event.inputs.project_dir }}
         env:
-          # 若 build_index/embedding 需要 OpenAI，保留；若本地嵌入可移除
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -euxo pipefail
@@ -127,7 +144,7 @@ jobs:
             ${{ github.event.inputs.project_dir }}/data/clean/chunks.jsonl
             ${{ github.event.inputs.project_dir }}/data/docs/index.faiss
             ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
-          key: faiss-${{ runner.os }}-${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event_inputs.project_dir)) }}
+          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-${{ env.INDEX_VERSION }}-${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
 
       - name: Upload index artifacts (debug)
         if: always()
@@ -140,14 +157,11 @@ jobs:
             ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
           if-no-files-found: warn
 
-      # ======== 執行 E2E ========
+      #  執行 E2E
       - name: Run E2E tests (OpenAI)
         working-directory: ${{ github.event.inputs.project_dir }}
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # 若你的應用要靠 env 指定索引路徑，在這裡補上：
-          # FAISS_INDEX_PATH: ./data/docs/index.faiss
-          # DOCSTORE_PATH:   ./data/docs/docstore.jsonl
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # e2e 測試一定要有
         run: |
           mkdir -p test-reports
           pytest -vv -m "e2e" \
