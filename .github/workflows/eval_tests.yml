@@ -178,7 +178,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           mkdir -p test-reports
-          pytest -m "eval" -vv -s --capture=tee-sys \ 
+          unset PYTEST_ADDOPTS || true # 防止空白參數從環境被帶入
+          pytest -m "eval" -vv -s --capture=tee-sys \
           --junitxml=test-reports/junit.xml
 
       - name: Upload JUnit report

@@ -8,12 +8,10 @@ from app.rate_limit import rate_limiter
 from app.cache import result_cache
 import app.config as config
 
-# 0) 只有「一般單元測試」才補假金鑰；e2e / eval / perf 一律不補
+# 0) 只有「一般單元測試」才補假金鑰；e2e / ingest / eval / perf 一律不補
 @pytest.fixture(autouse=True)
 def _fake_key_for_unit_tests(request, monkeypatch):
-    if (request.node.get_closest_marker("e2e") or 
-        request.node.get_closest_marker("eval") or
-        request.node.get_closest_marker("perf")):
+    if any(request.node.get_closest_marker(m) for m in ("e2e", "ingest", "perf", "eval")):
         return
     # 若外部未設定,才補上假的
     if not os.environ.get("OPENAI_API_KEY"):
@@ -36,12 +34,7 @@ def client_no_raise():
 @pytest.fixture(autouse=True)
 def _stub_llm(monkeypatch, request):
     # 先檢查是否要跳過 stub
-    if (
-        os.environ.get("RAG_DISABLE_STUB") == "1"
-        or request.node.get_closest_marker("eval")
-        or request.node.get_closest_marker("e2e")
-        or request.node.get_closest_marker("perf")
-    ):
+    if any(request.node.get_closest_marker(m) for m in ("e2e", "ingest", "perf", "eval")):
         return
 
     # 🔧 關鍵修正：直接 mock app.llm.answer_with_context 函數
@@ -149,12 +142,8 @@ def enable_real_rate_limit():
 # 6) Mock FAISS index,避免單元測試依賴實際檔案
 @pytest.fixture(autouse=True)
 def mock_faiss_index(monkeypatch, request):
-    """自動 mock FAISS index,但 e2e/ingest/perf 測試除外"""
-    if (
-        request.node.get_closest_marker("e2e") 
-        or request.node.get_closest_marker("ingest")
-        or request.node.get_closest_marker("perf")
-    ):
+    """自動 mock FAISS index,但 e2e/ingest/perf/eval 測試除外"""
+    if any(request.node.get_closest_marker(m) for m in ("e2e", "ingest", "perf", "eval")):
         return
     
     # 直接 mock routes.py 中的 _retrieve_candidates

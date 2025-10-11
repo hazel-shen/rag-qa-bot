@@ -43,7 +43,7 @@ data/clean
 data/docs
 
 # test data
-app/tests/data/eval_small**
+app/tests/data/eval_small_bk**
 
 
 # build artifacts
