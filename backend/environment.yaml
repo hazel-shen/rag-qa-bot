@@ -10,7 +10,7 @@ dependencies:
   - python-dotenv
   - tqdm
   - lxml
-  - beautifulsoup4
+  - beautifulsoup4>=4.12.0
   - conda-forge::faiss-cpu # 🔒 強制從 conda-forge 裝 faiss-cpu
   - pyyaml
   - redis

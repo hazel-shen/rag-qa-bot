@@ -1,10 +1,11 @@
 # app/ingest/cleaning.py
 import re
+from bs4 import BeautifulSoup
 
 # 先把 <script>/<style> 整段拿掉，再移除所有 HTML 標籤，最後做既有的空白與頁碼清理
-_SCRIPT_RE = re.compile(r"<script\b[^>]*>.*?</script>", flags=re.I | re.S)
-_STYLE_RE  = re.compile(r"<style\b[^>]*>.*?</style>",  flags=re.I | re.S)
-_TAG_RE    = re.compile(r"<[^>]+>")            # 其餘標籤
+# _SCRIPT_RE = re.compile(r"<script\b[^>]*>.*?</script>", flags=re.I | re.S)
+# _STYLE_RE  = re.compile(r"<style\b[^>]*>.*?</style>",  flags=re.I | re.S)
+# _TAG_RE    = re.compile(r"<[^>]+>")            # 其餘標籤
 _MULTI_WS  = re.compile(r"\s+")
 
 def normalize_whitespace(text: str) -> str:
@@ -36,14 +37,23 @@ def strip_page_noise(text: str) -> str:
     return out.strip()
 
 def _strip_html_blocks_and_tags(text: str) -> str:
-    # 1) 移除 <script>/<style> 及其內容
-    s = _SCRIPT_RE.sub(" ", text)
-    s = _STYLE_RE.sub(" ", s)
-    # 2) 移除所有 HTML 標籤
-    s = _TAG_RE.sub(" ", s)
-    # 3) 壓縮空白避免留下大量空格
-    s = _MULTI_WS.sub(" ", s).strip()
-    return s
+    # # 1) 移除 <script>/<style> 及其內容
+    # s = _SCRIPT_RE.sub(" ", text)
+    # s = _STYLE_RE.sub(" ", s)
+    # # 2) 移除所有 HTML 標籤
+    # s = _TAG_RE.sub(" ", s)
+    # # 3) 壓縮空白避免留下大量空格
+    # s = _MULTI_WS.sub(" ", s).strip()
+    # return s
+    """
+    使用 BeautifulSoup 解析 HTML，移除 <script>/<style> 並剝離所有標籤，只保留純文字。
+    對於非 HTML 純文字輸入也安全（會原樣取出文字，再進行空白壓縮）。
+    """
+    soup = BeautifulSoup(text, "html.parser")
+    for tag in soup(["script", "style"]):
+        tag.decompose()  # 徹底移除節點與其內容
+    s = soup.get_text(separator=" ")
+    return _MULTI_WS.sub(" ", s).strip()
 
 def basic_clean(text: str) -> str:
     """
