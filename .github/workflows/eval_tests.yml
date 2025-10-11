@@ -1,0 +1,190 @@
+name: Eval (small)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch or tag to test"
+        required: true
+        default: "main"
+      python_version:
+        description: "Python version"
+        required: true
+        default: "3.11"
+      project_dir:
+        description: "Project directory"
+        required: true
+        default: "backend"
+      dataset_path:
+        description: "Path to eval JSONL (relative to backend)"
+        required: true
+        default: "app/tests/data/eval_small.jsonl"
+      jaccard_threshold:
+        description: "EVAL_JACCARD_THRESHOLD"
+        required: true
+        default: "0.60"
+      pass_rate:
+        description: "EVAL_PASS_RATE"
+        required: true
+        default: "0.60"
+      ngram_n:
+        description: "EVAL_NGRAM_N"
+        required: true
+        default: "2"
+
+concurrency:
+  group: eval-small-${{ github.event.inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  eval-small:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    # 非敏感、穩定參數集中在這（以 backend 為工作目錄）
+    env:
+      # 建議保留，避免 CI 連 Redis
+      CACHE_BACKEND: memory
+
+      # 查詢端需要的嵌入模型（retrieval 會讀 settings.embed_model）
+      EMBED_MODEL: text-embedding-3-small
+
+      # 索引與 docstore 的實際路徑（以 backend 為 working-directory）
+      INDEX_PATH: ./data/docs/index.faiss
+      DOCSTORE_PATH: ./data/docs/docstore.jsonl
+
+    steps:
+      - name: Checkout ${{ github.event.inputs.branch }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set up Python ${{ github.event.inputs.python_version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ github.event.inputs.python_version }}
+
+      # 套件安裝（與 unit tests 一致，使用 uv）
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        working-directory: ${{ github.event.inputs.project_dir }}
+        run: |
+          if [[ -f requirements.txt ]]; then uv pip install -r requirements.txt --system; fi
+          if [[ -f requirements-dev.txt ]]; then uv pip install -r requirements-dev.txt --system; fi
+          if [[ -f pyproject.toml ]]; then uv pip install -e . --system; fi
+
+      # 確認 OPENAI_API_KEY 存在（eval 會打真實 API）
+      - name: Validate OPENAI_API_KEY
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "::error::Missing OPENAI_API_KEY (set it in Repository secrets)"
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is set (masked)."
+
+      #  索引快取（與嵌入/版本綁定，避免維度不符）
+      - name: Restore FAISS index cache
+        id: faiss-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ github.event.inputs.project_dir }}/data/clean/chunks.jsonl
+            ${{ github.event.inputs.project_dir }}/data/docs/index.faiss
+            ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
+          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-\
+            ${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-\
+            ${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
+
+      - name: Verify raw docs exist (if cache miss)
+        if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
+        working-directory: ${{ github.event.inputs.project_dir }}
+        run: |
+          shopt -s nullglob
+          files=(data/raw/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "❌ backend/data/raw/ 沒有任何原始文件，無法建立索引"
+            exit 1
+          fi
+
+      - name: Build corpus (clean & slice)
+        if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
+        working-directory: ${{ github.event.inputs.project_dir }}
+        run: |
+          set -euxo pipefail
+          mkdir -p data/clean data/docs
+          python -m app.ingest.cli_ingest \
+            --input ./data/raw \
+            --out ./data/clean/chunks.jsonl
+          test -s data/clean/chunks.jsonl
+
+      - name: Build FAISS index
+        if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
+        working-directory: ${{ github.event.inputs.project_dir }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euxo pipefail
+          python -m app.build_index \
+            --chunks ./data/clean/chunks.jsonl \
+            --docstore ./data/docs/docstore.jsonl \
+            --index ./data/docs/index.faiss
+          test -s data/docs/index.faiss
+          test -s data/docs/docstore.jsonl
+
+      - name: Save FAISS index cache
+        if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ github.event.inputs.project_dir }}/data/clean/chunks.jsonl
+            ${{ github.event.inputs.project_dir }}/data/docs/index.faiss
+            ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
+          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-\
+            ${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-\
+            ${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
+
+      # （可選）簡單檢查索引維度，避免 FAISS 斷言
+      - name: Debug index dimension
+        working-directory: ${{ github.event.inputs.project_dir }}
+        run: |
+          python - <<'PY'
+          import faiss, os
+          p="data/docs/index.faiss"
+          print("index exists:", os.path.exists(p))
+          if os.path.exists(p):
+              idx=faiss.read_index(p); print("index.d =", idx.d)
+          PY
+
+      #  執行 eval
+      - name: Run eval
+        working-directory: ${{ github.event.inputs.project_dir }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          mkdir -p test-reports
+          pytest -m "eval" -vv -s --capture=tee-sys \ 
+          --junitxml=test-reports/junit.xml
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-eval-py${{ github.event.inputs.python_version }}
+          path: ${{ github.event.inputs.project_dir }}/test-reports/junit.xml
+          if-no-files-found: warn
