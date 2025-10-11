@@ -4,9 +4,36 @@ from __future__ import annotations
 import re
 import time
 from typing import Optional
+import pytest
 
 from app.security import load_policy
 from starlette.testclient import TestClient
+from unittest.mock import Mock
+
+@pytest.fixture(autouse=True)
+def ensure_llm_mock(monkeypatch):
+    """確保 LLM 被正確 mock，避免真的打 OpenAI"""
+    # Mock answer_with_context 函數
+    mock_response = {
+        "text": "Mock response for input validation test",
+        "usage": {
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "total_tokens": 15
+        },
+        "cost_usd": 0.0001
+    }
+    
+    import app.llm
+    monkeypatch.setattr(app.llm, "answer_with_context", lambda q, ctx: mock_response)
+    
+    # 也 mock _retrieve_candidates 避免依賴 FAISS
+    import app.routes
+    def mock_retrieve(query, k):
+        return [
+            {"id": "test-1", "title": "Test", "text": "Test content", "source": "test.txt", "score": 0.9}
+        ]
+    monkeypatch.setattr(app.routes, "_retrieve_candidates", mock_retrieve)
 
 
 def _metric_value(text: str, metric: str, labels: Optional[dict] = None) -> float:

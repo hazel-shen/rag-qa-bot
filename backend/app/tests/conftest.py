@@ -1,20 +1,21 @@
 # app/tests/conftest.py
 import os
+import sys
 import pytest
+from unittest.mock import MagicMock, Mock, patch
 from fastapi.testclient import TestClient
 from app.rate_limit import rate_limiter
 from app.cache import result_cache
 import app.config as config
 
-# ⚠️ 不要在全域就塞假金鑰，避免 e2e 無法正確 skip
-# os.environ.setdefault("OPENAI_API_KEY", "sk-test-fake")
-
-# 0) 只有「一般單元測試」才補假金鑰；e2e / eval 一律不補
+# 0) 只有「一般單元測試」才補假金鑰；e2e / eval / perf 一律不補
 @pytest.fixture(autouse=True)
 def _fake_key_for_unit_tests(request, monkeypatch):
-    if request.node.get_closest_marker("e2e") or request.node.get_closest_marker("eval"):
+    if (request.node.get_closest_marker("e2e") or 
+        request.node.get_closest_marker("eval") or
+        request.node.get_closest_marker("perf")):
         return
-    # 若外部未設定，才補上假的
+    # 若外部未設定,才補上假的
     if not os.environ.get("OPENAI_API_KEY"):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
 
@@ -30,53 +31,76 @@ def client_no_raise():
     from app.main import app
     return TestClient(app, raise_server_exceptions=False)
 
-
 # 2) 全域打樁：避免打到 OpenAI（必要）
-#    但若 RAG_DISABLE_STUB=1 或者 test 有 @pytest.mark.eval / @pytest.mark.e2e，就完全不打樁
+#    但若 RAG_DISABLE_STUB=1 或者 test 有 @pytest.mark.eval / @pytest.mark.e2e / @pytest.mark.perf,就完全不打樁
 @pytest.fixture(autouse=True)
 def _stub_llm(monkeypatch, request):
+    # 先檢查是否要跳過 stub
     if (
         os.environ.get("RAG_DISABLE_STUB") == "1"
         or request.node.get_closest_marker("eval")
         or request.node.get_closest_marker("e2e")
+        or request.node.get_closest_marker("perf")
     ):
         return
 
-    # ---- eval-like 離線檢索回答（不打外部 API）----
-    def retrieval_only_answer(query, context):
-        texts = []
-        if isinstance(context, (list, tuple)):
-            for c in context:
-                t = c.get("text") if isinstance(c, dict) else (str(c) if c is not None else "")
-                if t:
-                    texts.append(t)
-        blob = "\n".join(texts)
-
-        import re
-        def _norm(s): return re.sub(r"\s+", "", (s or "")).lower()
-        q = _norm(query)
-        best = ""
-        best_score = -1
-        for seg in re.split(r"(?<=[。.!?？])\s+", blob) if blob else []:
-            s = _norm(seg)
-            score = len(set(q) & set(s))
-            if score > best_score:
-                best_score, best = score, seg
-        text = (best or texts[0] if texts else "")[:400]
-        return {"text": text, "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}, "cost_usd": 0.0}
-
-    monkeypatch.setattr("app.llm.answer_with_context", retrieval_only_answer, raising=False)
-
-    # 若你的 reranker 也會呼叫雲端，保留原本的假 rerank（或自行移除）
+    # 🔧 關鍵修正：直接 mock app.llm.answer_with_context 函數
+    # 而不是 mock OpenAI client
+    def mock_answer_with_context(query: str, context):
+        return {
+            "text": f"Mock LLM response for: {query[:50]}",
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 50, 
+                "total_tokens": 150
+            },
+            "cost_usd": 0.001
+        }
+    
+    # 確保 app.llm 被導入
+    import app.llm as llm_module
+    monkeypatch.setattr(llm_module, "answer_with_context", mock_answer_with_context)
+    
+    # 如果 llm 模組有 _client 屬性，設為 None 避免真實初始化
+    if hasattr(llm_module, "_client"):
+        monkeypatch.setattr(llm_module, "_client", None)
+    
+    # Mock app.routes._retrieve_candidates 避免依賴 FAISS
+    def mock_retrieve_candidates(query, k):
+        return [
+            {
+                "id": "mock-doc-1",
+                "title": "Mock Document 1",
+                "text": "This is mock document 1",
+                "source": "mock1.txt",
+                "score": 0.9
+            },
+            {
+                "id": "mock-doc-2",
+                "title": "Mock Document 2",
+                "text": "This is mock document 2",
+                "source": "mock2.txt",
+                "score": 0.8
+            }
+        ]
+    
     try:
-        def fake_rerank(query, cands):
-            for i, c in enumerate(cands):
-                c["reranker_score"] = 1.0 - i * 0.01
-            return cands[:]
-        monkeypatch.setattr("app.reranker.rerank", fake_rerank, raising=False)
-    except Exception:
+        import app.routes as routes_module
+        monkeypatch.setattr(routes_module, "_retrieve_candidates", mock_retrieve_candidates)
+    except:
         pass
 
+    # Mock reranker 
+    def fake_rerank(query, cands):
+        for i, c in enumerate(cands):
+            c["reranker_score"] = 1.0 - i * 0.01
+        return cands[:]
+    
+    try:
+        import app.reranker as reranker_module
+        monkeypatch.setattr(reranker_module, "rerank", fake_rerank)
+    except:
+        pass
 
 # 3) 一般測試：放寬限流（自動套用）
 @pytest.fixture(autouse=True)
@@ -122,13 +146,14 @@ def enable_real_rate_limit():
     config.settings.disable_rate_limit = old_disable
     rate_limiter.reset_buckets()
 
-# 6) Mock FAISS index，避免單元測試依賴實際檔案
+# 6) Mock FAISS index,避免單元測試依賴實際檔案
 @pytest.fixture(autouse=True)
 def mock_faiss_index(monkeypatch, request):
-    """自動 mock FAISS index，但 e2e/ingest 測試除外"""
+    """自動 mock FAISS index,但 e2e/ingest/perf 測試除外"""
     if (
         request.node.get_closest_marker("e2e") 
         or request.node.get_closest_marker("ingest")
+        or request.node.get_closest_marker("perf")
     ):
         return
     
@@ -161,7 +186,16 @@ def mock_faiss_index(monkeypatch, request):
     def mock_retrieve_topk(query, k):
         return mock_retrieve_candidates(query, k)
     
-    monkeypatch.setattr("app.routes._retrieve_candidates", mock_retrieve_candidates)
-    monkeypatch.setattr("app.retrieval.load_index", mock_load_index)
-    monkeypatch.setattr("app.retrieval.search", mock_search)
-    monkeypatch.setattr("app.retrieval.retrieve_topk", mock_retrieve_topk)
+    try:
+        import app.routes as routes_module
+        monkeypatch.setattr(routes_module, "_retrieve_candidates", mock_retrieve_candidates)
+    except:
+        pass
+    
+    try:
+        import app.retrieval as retrieval_module
+        monkeypatch.setattr(retrieval_module, "load_index", mock_load_index)
+        monkeypatch.setattr(retrieval_module, "search", mock_search)
+        monkeypatch.setattr(retrieval_module, "retrieve_topk", mock_retrieve_topk)
+    except:
+        pass
