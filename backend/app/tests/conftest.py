@@ -121,3 +121,47 @@ def enable_real_rate_limit():
     config.settings.env = old_env
     config.settings.disable_rate_limit = old_disable
     rate_limiter.reset_buckets()
+
+# 6) Mock FAISS index，避免單元測試依賴實際檔案
+@pytest.fixture(autouse=True)
+def mock_faiss_index(monkeypatch, request):
+    """自動 mock FAISS index，但 e2e/ingest 測試除外"""
+    if (
+        request.node.get_closest_marker("e2e") 
+        or request.node.get_closest_marker("ingest")
+    ):
+        return
+    
+    # 直接 mock routes.py 中的 _retrieve_candidates
+    def mock_retrieve_candidates(query, k):
+        return [
+            {
+                "id": "mock-doc-1",
+                "title": "Mock Document 1",
+                "text": "This is mock document 1",
+                "source": "mock1.txt",
+                "score": 0.9
+            },
+            {
+                "id": "mock-doc-2",
+                "title": "Mock Document 2",
+                "text": "This is mock document 2",
+                "source": "mock2.txt",
+                "score": 0.8
+            }
+        ]
+    
+    # 同時 mock retrieval 層的函數
+    def mock_load_index():
+        pass
+    
+    def mock_search(query, k):
+        return [("mock-doc-1", 0.9), ("mock-doc-2", 0.8)]
+    
+    def mock_retrieve_topk(query, k):
+        return mock_retrieve_candidates(query, k)
+    
+    monkeypatch.setattr("app.routes._retrieve_candidates", mock_retrieve_candidates)
+    monkeypatch.setattr("app.retrieval.load_index", mock_load_index)
+    monkeypatch.setattr("app.retrieval.search", mock_search)
+    monkeypatch.setattr("app.retrieval.retrieve_topk", mock_retrieve_topk)

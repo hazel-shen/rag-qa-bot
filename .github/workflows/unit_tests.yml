@@ -1,0 +1,87 @@
+name: Unit Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch or tag to test"
+        required: true
+        default: "main"
+      python_version:
+        description: "Python version"
+        required: true
+        default: "3.11"
+      project_dir:
+        description: "Project directory"
+        required: true
+        default: "backend"
+      extra_pytest_args:
+        description: "Extra pytest args (optional)"
+        required: false
+        default: "-vv"
+
+concurrency:
+  group: unit-tests-${{ github.event.inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+
+    env:
+      PYTHONUNBUFFERED: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      TORCH_NUM_THREADS: "1"
+      PYTEST_ADDOPTS: "-ra --tb=short"
+      AWS_DEFAULT_REGION: "us-east-1"
+      APP_ENV: "test"
+
+    steps:
+      - name: Checkout ${{ github.event.inputs.branch }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Set up Python ${{ github.event.inputs.python_version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ github.event.inputs.python_version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        working-directory: ${{ github.event.inputs.project_dir }}
+        run: |
+          if [[ -f requirements.txt ]]; then uv pip install -r requirements.txt --system; fi
+          if [[ -f requirements-dev.txt ]]; then uv pip install -r requirements-dev.txt --system; fi
+          if [[ -f pyproject.toml ]]; then uv pip install -e . --system; fi
+
+      - name: Run unit tests
+        working-directory: ${{ github.event.inputs.project_dir }}
+        run: |
+          mkdir -p test-reports
+          pytest -m "not e2e and not perf and not eval" \
+            ${{ github.event.inputs.extra_pytest_args }} \
+            --junitxml=test-reports/junit.xml
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-unit-py${{ github.event.inputs.python_version }}
+          path: ${{ github.event.inputs.project_dir }}/test-reports/junit.xml
+          if-no-files-found: warn

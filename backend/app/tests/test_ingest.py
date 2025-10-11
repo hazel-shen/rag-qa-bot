@@ -88,3 +88,4 @@ def test_ingest_end_to_end_builds_index(tmp_path: Path):
         doc_lines = sum(1 for _ in open(docstore, "r", encoding="utf-8"))
         chunk_lines = sum(1 for _ in open(chunks_path, "r", encoding="utf-8"))
         assert doc_lines == chunk_lines, "docstore and chunks line counts differ"
+
