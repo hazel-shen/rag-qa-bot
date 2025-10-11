@@ -37,7 +37,6 @@ jobs:
       TOKENIZERS_PARALLELISM: "false"
       TORCH_NUM_THREADS: "1"
       PYTEST_ADDOPTS: "-ra --tb=short"
-      AWS_DEFAULT_REGION: "us-east-1"
       APP_ENV: "test"
 
     steps:
