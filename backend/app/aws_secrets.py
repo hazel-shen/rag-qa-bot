@@ -73,8 +73,18 @@ def load_from_secrets_manager(
         return data
 
     except (BotoCoreError, ClientError) as e:
-        logger.warning("AWS Secrets Manager error for %s: %s", secret_id, e)
-    except (ValueError, json.JSONDecodeError) as e:
-        logger.warning("Invalid secret format for %s: %s", secret_id, e)
+        err = getattr(e, "response", {}).get("Error", {})
+        code = err.get("Code", e.__class__.__name__)
+        req_id = getattr(e, "response", {}).get("ResponseMetadata", {}).get("RequestId")
+        logger.warning(
+            "AWS Secrets Manager error",
+            extra={"err_code": code, "aws_request_id": req_id, "region": region},
+        )
+        return {}
 
-    return {}
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.warning(
+            "Invalid secret format",
+            extra={"err_type": e.__class__.__name__},
+        )
+        return {}

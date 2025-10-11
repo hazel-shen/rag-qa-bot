@@ -15,6 +15,7 @@ dependencies:
   - pyyaml
   - redis
   - pytorch
+  - boto3
   - pip:
       - fastapi
       - uvicorn
