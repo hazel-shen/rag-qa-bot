@@ -1,6 +1,7 @@
 # Day27 - FAQ Bot (RAG + FAISS + OpenAI)
 
-本專案為 2025 鐵人賽 Day27 的成果：將前面實作的元件整合成一個可 Demo 的 FAQ Chatbot 雛型，具備以下能力：
+本專案為 2025 鐵人賽 Day27 的成果。
+將前面實作的元件整合成一個可 Demo 的 FAQ Chatbot 雛型，具備以下能力：
 
 - **API**：`/ask` 問答、`/healthz` 健康檢查、`/metrics` 指標
 - **檢索**：FAISS 向量資料庫（持久化）

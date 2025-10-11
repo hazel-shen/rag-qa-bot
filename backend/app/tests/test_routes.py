@@ -40,7 +40,7 @@ def test_ask_cache_hit(client, mocker):
     mocker.patch("app.retrieval.retrieve_topk", return_value=[
         {"id": "c1", "title": "Doc1", "text": "aaa", "source": "s1", "score": 0.9},
     ])
-    mocker.patch("app.reranker.rerank", return_value=[
+    mocker.patch("app.routes.rerank", return_value=[
         {"id": "c1", "title": "Doc1", "text": "aaa", "source": "s1", "score": 0.9, "reranker_score": 0.99},
     ])
     mocker.patch("app.llm.answer_with_context", return_value={
@@ -78,6 +78,9 @@ def test_ask_rerank_fallback_on_error(client, mocker):
     assert d["answer"] == "fallback ok"
     # sources 應該還是存在，只是沒有 reranker_score（或為 None）
     assert len(d["meta"]["sources"]) >= 1
+    # 回應不應曝露例外或堆疊
+    assert "Traceback" not in r.text
+    assert "RuntimeError" not in r.text
 
 
 def test_ask_rerank_exception_fallback_and_metrics(client, mocker):

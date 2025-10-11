@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import logging
 from uuid import uuid4
 from typing import Any, Dict, List, Tuple
 
@@ -113,7 +114,14 @@ def _rerank_candidates(query: str, cands: List[Dict[str, Any]]) -> Tuple[List[Di
             topk, status, err = res, "ok", None
     except Exception as e:
         ERROR_COUNT.labels(stage="rerank").inc()
-        topk, status, err = cands[:settings.top_k], "fallback", f"{type(e).__name__}: {e}"
+        logger = logging.getLogger(__name__)
+        trace_id = str(uuid4())
+        # 只在伺服端留下完整堆疊；不把 e/stack 傳給用戶
+        logger.exception("Exception during reranking", extra={"trace_id": trace_id})
+         # 對外只回傳淨化後的錯誤（或用你既有的結構/型別）
+        topk = cands[:settings.top_k]
+        status = "fallback"
+        err = {"code": "INTERNAL", "trace_id": trace_id}
     finally:
         RERANK_LATENCY.observe(time.time() - t0)
     return topk, status, err
