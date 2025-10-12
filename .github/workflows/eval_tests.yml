@@ -42,6 +42,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      actions: write
 
     # 非敏感、穩定參數集中在這（以 backend 為工作目錄）
     env:
@@ -54,6 +55,14 @@ jobs:
       # 索引與 docstore 的實際路徑（以 backend 為 working-directory）
       INDEX_PATH: ./data/docs/index.faiss
       DOCSTORE_PATH: ./data/docs/docstore.jsonl
+
+      # Hugging Face 快取
+      HF_HOME: ~/.cache/huggingface
+      HF_HUB_ENABLE_HF_TRANSFER: "0" # 走更快的傳輸（可選）
+
+      # Reranker
+      RERANK_PROVIDER: local
+      RERANK_MODEL: BAAI/bge-reranker-v2-m3
 
     steps:
       - name: Checkout ${{ github.event.inputs.branch }}
@@ -87,6 +96,40 @@ jobs:
           if [[ -f requirements-dev.txt ]]; then uv pip install -r requirements-dev.txt --system; fi
           if [[ -f pyproject.toml ]]; then uv pip install -e . --system; fi
 
+      - name: Cache HF models
+        id: hf-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/torch
+            ~/.cache/sentence_transformers
+          key: hf-${{ runner.os }}-${{ env.RERANK_MODEL }}-v1
+          restore-keys: |
+            hf-${{ runner.os }}-${{ env.RERANK_MODEL }}-
+
+      # 只有在 cache miss 才預熱一次，避免收集期 import 才下載
+      - name: Warm up reranker model
+        if: steps.hf-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ github.event.inputs.project_dir }} # 加上工作目錄
+        run: |
+          python - <<'PY'
+          from sentence_transformers import CrossEncoder
+          CrossEncoder("BAAI/bge-reranker-v2-m3")
+          print("warm ok")
+          PY
+
+      # 預熱後把下載好的權重存回快取
+      - name: Save HF models cache
+        if: steps.hf-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/torch
+            ~/.cache/sentence_transformers
+          key: hf-${{ runner.os }}-${{ env.RERANK_MODEL }}-v1
+
       # 確認 OPENAI_API_KEY 存在（eval 會打真實 API）
       - name: Validate OPENAI_API_KEY
         env:
@@ -107,9 +150,7 @@ jobs:
             ${{ github.event.inputs.project_dir }}/data/clean/chunks.jsonl
             ${{ github.event.inputs.project_dir }}/data/docs/index.faiss
             ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
-          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-\
-            ${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-\
-            ${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
+          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
 
       - name: Verify raw docs exist (if cache miss)
         if: steps.faiss-cache-restore.outputs.cache-hit != 'true'
@@ -155,9 +196,7 @@ jobs:
             ${{ github.event.inputs.project_dir }}/data/clean/chunks.jsonl
             ${{ github.event.inputs.project_dir }}/data/docs/index.faiss
             ${{ github.event.inputs.project_dir }}/data/docs/docstore.jsonl
-          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-\
-            ${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-\
-            ${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
+          key: faiss-${{ runner.os }}-${{ env.EMBED_MODEL }}-${{ hashFiles(format('{0}/data/raw/**', github.event.inputs.project_dir)) }}-${{ hashFiles(format('{0}/app/ingest/**', github.event.inputs.project_dir), format('{0}/app/build_index*', github.event.inputs.project_dir)) }}
 
       # （可選）簡單檢查索引維度，避免 FAISS 斷言
       - name: Debug index dimension
@@ -176,6 +215,11 @@ jobs:
         working-directory: ${{ github.event.inputs.project_dir }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # 把 inputs 透過環境變數餵給測試檔
+          EVAL_DATASET: ${{ github.event.inputs.dataset_path }}
+          EVAL_JACCARD_THRESHOLD: ${{ github.event.inputs.jaccard_threshold }}
+          EVAL_PASS_RATE: ${{ github.event.inputs.pass_rate }}
+          EVAL_NGRAM_N: ${{ github.event.inputs.ngram_n }}
         run: |
           mkdir -p test-reports
           unset PYTEST_ADDOPTS || true # 防止空白參數從環境被帶入
