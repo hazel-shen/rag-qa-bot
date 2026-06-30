@@ -38,13 +38,11 @@ venv/
 # Docker / data volumes
 volumes/
 
-# RAG intermediate files
-data/clean
-data/docs
-
-# test data
-app/tests/data/eval_small_bk**
-
+# RAG 產生的檔案（ingest / build_index 的輸出）
+data/clean/
+data/docs/
+data/*.faiss
+data/*.jsonl
 
 # build artifacts
 index/

@@ -1,4 +1,22 @@
-## 🚀 安裝與環境
+# Backend
+
+## 前置條件
+
+| 工具 | 說明 |
+| ---- | ---- |
+| conda | 管理 Python 環境 |
+| Git LFS | raw data 用 LFS 管理，未安裝會 ingest 到指標字串而非真實內容 |
+| Docker（選用） | 僅使用 Redis cache 時需要 |
+| jq（選用） | 美化 curl 輸出用 |
+
+```bash
+brew install git-lfs jq   # macOS
+git lfs install && git lfs pull
+```
+
+## 快速開始
+
+**1. 建立環境**
 
 ```bash
 cd backend
@@ -6,135 +24,81 @@ conda env create -f environment.yaml
 conda activate rag_qa_bot
 ```
 
-建立 .env：
+**2. 建立 `.env`**（路徑以 `backend/` 為基準）
 
 ```plaintext
 OPENAI_API_KEY=sk-xxxx
 EMBED_MODEL=text-embedding-3-small
-CHAT_MODEL=gpt-4o-mini
-DATA_DIR=backend/data
-INDEX_PATH=backend/data/index.faiss
-DOCSTORE_PATH=backend/data/docstore.jsonl
+CHAT_MODEL=gpt-5.4-mini
+DATA_DIR=./data
+INDEX_PATH=./data/index.faiss
+DOCSTORE_PATH=./data/docstore.jsonl
 TOP_K=3
 MAX_CONTEXT_CHARS=1800
 ANSWER_MAX_TOKENS=400
+CACHE_BACKEND=memory
 ```
 
-## 🔧 文件清洗 & 切片
+> `gpt-5.4-mini`（及更新的 reasoning 系列）使用 `max_completion_tokens`，已在 `llm.py` 處理，換回舊模型不需額外修改。
 
-把原始文件放進 `backend/data/raw/`（支援 .pdf/.docx/.html/.md/.txt）。
-這些檔案會先經過 Loader，依副檔名選擇對應的解析方式（例如 PDF 用 PyMuPDF，DOCX 用 python-docx，HTML 用 BeautifulSoup），最後統一轉換成純文字，再進行清洗與切片。
-
-執行：
+**3. Ingest & 建索引**（在 `backend/` 下執行，會呼叫 Embedding API）
 
 ```bash
-python -m app.ingest.cli_ingest \
-  --input ./data/raw \
-  --out ./data/clean/chunks.jsonl
-```
-
-輸出：
-
-```bash
-backend/data/clean/chunks.jsonl → 切片後的語料
-```
-
-## 📖 建立 FAISS 索引
-
-提供兩種模式：
-
-| 項目     | 快速模式 (`docs/`)              | 完整模式 (`raw/ → clean/`)                       |
-| -------- | ------------------------------- | ------------------------------------------------ |
-| 支援格式 | `.txt`, `.md`                   | `.pdf`, `.docx`, `.html`, `.txt`, `.md`          |
-| 清洗     | 簡單換行切分                    | 正規化空白、移除頁碼、去重                       |
-| 輸出     | `index.faiss`, `docstore.jsonl` | `chunks.jsonl` → `index.faiss`, `docstore.jsonl` |
-
-```bash
+python -m app.ingest.cli_ingest --input ./data/raw --out ./data
 python -m app.build_index \
   --chunks ./data/clean/chunks.jsonl \
-  --docstore ./data/docs/docstore.jsonl \
-  --index ./data/docs/index.faiss
+  --docstore ./data/docstore.jsonl \
+  --index ./data/index.faiss
 ```
 
-## 🏃‍♂️ 啟動服務
+**4. 啟動服務**
 
 ```bash
-cd backend
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8000
 ```
 
-端點：
+## 端點
 
-- GET /healthz → 健康檢查
-- POST /ask → 問答 API
-- GET /metrics → Prometheus 指標
+| 端點 | 說明 |
+| ---- | ---- |
+| `GET /healthz` | 健康檢查 |
+| `POST /ask` | 問答 API |
+| `GET /metrics` | Prometheus 指標 |
 
-## 📡 API 測試
+## API 測試
 
 ```bash
+# 完整回應
 curl -s -X POST http://127.0.0.1:8000/ask \
- -H "Content-Type: application/json" \
- -d '{"query":"請簡述 FAQ Bot 的系統架構"}'
+  -H "Content-Type: application/json" \
+  -d '{"query":"請簡述 FAQ Bot 的系統架構"}' | jq .
+
+# 只看回答
+curl -s -X POST http://127.0.0.1:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"query":"請簡述 FAQ Bot 的系統架構"}' | jq -r '.answer'
 ```
 
-## 🧪 測試策略
+## Cache
 
-專案使用 pytest，並透過 pytest.ini 管理標記：
+| 模式 | CACHE_BACKEND | 說明 |
+| ---- | ------------- | ---- |
+| 記憶體（預設） | `memory` | 無需額外服務，重啟後清空 |
+| Redis | `redis` | 需先啟動 Redis，重啟後資料保留 |
 
-```plaintext
-addopts = -m "not e2e and not perf"
-
-markers =
-  e2e: end-to-end 測試，會打 OpenAI API ⚠️
-  perf: 效能測試，本地 mock，測 QPS/延遲
-```
-
-執行方式：
-
-- 單元測試 (預設)：
+使用 Redis 時，先在專案根目錄啟動：
 
 ```bash
-pytest -v
+docker compose up redis -d   # 從 rag-qa-bot/ 執行
 ```
 
-E2E 測試（打真的 OpenAI API，有成本 ⚠️）：
+> ⚠️ `CACHE_BACKEND=redis` 但 Redis 未啟動時，`/ask` 會回傳 500。
 
-```bash
-pytest -m e2e -v
-```
+## 測試
 
-效能測試 (mock)：
-
-```bash
-pytest -m perf -v
-```
-
-回答品質測試（打真的 OpenAI API，有成本 ⚠️）：
-
-```bash
-pytest -m eval -s -vv
-```
-
-## 🛡️ 安全防護
-
-- 阻擋內網 URL（127.0.0.1 / localhost）
-- SQL Injection 關鍵字過濾
-- 輸入長度限制
-
-## 🎯 功能特色
-
-- RAG 檢索 + 重排 (FAISS + OpenAI)
-- 文件清洗與切片 (Ingest pipeline)
-- 成本追蹤與快取機制
-- Prometheus 指標收集
-- Docker 容器化部署
-
-## 🔄 待辦 (未來)
-
-- 壓測數據（證明 p95 ≤3s、QPS ≥3）(Day02)
-- 正確性檢查（用一小份 dataset 驗證回答合理性）-> 做完了，可是準率可以更好
-- 實作員工/部門？
-- 更進階的清洗/切片策略
-- Citation 格式化
-- CI/CD 自動建索引與部署
-- 使用者認證與權限管理
+| 指令 | 說明 |
+| ---- | ---- |
+| `pytest -v` | 單元測試（預設） |
+| `pytest -m e2e -v` | E2E 測試，打真實 OpenAI API ⚠️ |
+| `pytest -m perf -v` | 效能測試（mock） |
+| `pytest -m eval -s -vv` | 回答品質測試，打真實 OpenAI API ⚠️ |

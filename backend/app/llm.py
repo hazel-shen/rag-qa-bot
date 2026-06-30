@@ -13,14 +13,16 @@ def _client_lazy() -> OpenAI:
         _client = OpenAI(api_key=settings.openai_api_key or None)
     return _client
 
-# 參考價（可依實際更新）
+# 參考價（USD / 1M tokens）
 PRICE = {
-    # USD / 1M tokens 估算（請依官方更新）
-    "gpt-4o-mini": {"input": 0.150, "output": 0.600}
+    "gpt-5.4-mini":  {"input": 0.75,  "output": 4.50},
+    "gpt-4.1-mini":  {"input": 0.40,  "output": 1.60},
+    "gpt-4o-mini":   {"input": 0.150, "output": 0.600},
 }
+_DEFAULT_PRICE = {"input": 0.75, "output": 4.50}
 
 def _estimate_cost(model: str, in_tokens: int, out_tokens: int) -> float:
-    p = PRICE.get(model, PRICE["gpt-4o-mini"])
+    p = PRICE.get(model, _DEFAULT_PRICE)
     return (in_tokens/1_000_000)*p["input"] + (out_tokens/1_000_000)*p["output"]
 
 
@@ -44,7 +46,7 @@ def answer_with_context(query: str, context: str) -> Dict[str, Any]:
                 {"role":"user","content": user},
             ],
             temperature=0.2,
-            max_tokens=settings.answer_max_tokens,
+            max_completion_tokens=settings.answer_max_tokens,
         )
     except Exception:
         ERROR_COUNT.labels(stage="llm").inc()
