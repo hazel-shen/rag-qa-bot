@@ -1,5 +1,3 @@
-version: "3.9"
-
 name: RAG-QA-BOT
 
 services:
@@ -26,7 +24,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./dashboards:/var/lib/grafana/dashboards/seed:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards/seed:ro
+      - ./observability/provisioning:/etc/grafana/provisioning:ro
     ports:
       - "3000:3000"
     depends_on:

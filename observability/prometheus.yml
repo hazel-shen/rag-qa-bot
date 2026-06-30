@@ -15,12 +15,18 @@ scrape_configs:
   # 抓取本機後端（請確保後端跑在宿主機 8000）
   # 若後端也在 docker 內，請改成容器內可達的服務名稱與埠。
   - job_name: "faq-api"
-    metrics_path: /metrics
+    metrics_path: /metrics/
     static_configs:
       - targets: ["host.docker.internal:8000"]
     relabel_configs:
       - target_label: job
         replacement: "faq-api-dev"
+
+  # Agent Governance Demo：scrape Pushgateway（Demo CLI push 進來的 counter）
+  - job_name: "agent-governance"
+    honor_labels: true
+    static_configs:
+      - targets: ["host.docker.internal:9091"]
 
   # - job_name: "redis"
   #   static_configs:

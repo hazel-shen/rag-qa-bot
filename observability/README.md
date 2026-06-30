@@ -21,7 +21,7 @@
 
 ```bash
 cd observability
-docker compose up -d
+docker-compose up -d
 ```
 
 啟動後：
