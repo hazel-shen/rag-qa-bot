@@ -1,0 +1,98 @@
+<svg width="100%" viewBox="0 0 680 560" xmlns="http://www.w3.org/2000/svg" role="img" font-family="system-ui, -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif">
+<title>三段 Demo 總覽地圖</title>
+<desc>進 demo 前的地圖，三段並列對應三層治理：Demo 1 攔截加監控（行為治理，agent 能做什麼），readonly 查財報放行、寄信被擋，兩個 Prometheus counter 跳動，停用 gate 對照組 send_email 真的執行；Demo 2 retrieval ACL（資料治理，agent 能查什麼），readonly restricted query 在發 /ask 前就被擋，並展示 require_approval 第三態；Demo 3 Agent 產生 policy patch（規則治理，誰能改規則），經 opa test 紅燈修正後綠燈、CI 把關才合併。三段共用同一個 tool 執行前的 Policy Gate，並由一個橫跨三段的可觀測/稽核層（metrics dashboard + audit log）做事後驗證。</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<rect x="0" y="0" width="680" height="560" fill="#ffffff"/>
+<text x="340" y="30" text-anchor="middle" font-size="14" font-weight="500" fill="#2C2C2A">三段 Demo 地圖：同一個 gate，三種治理場景</text>
+<text x="340" y="52" text-anchor="middle" font-size="12" fill="#5F5E5A">攔截點都在 tool 執行前 — 可觀測 → 可攔截 → 可治理地修正</text>
+<text x="340" y="68" text-anchor="middle" font-size="12" font-weight="500"><tspan fill="#185FA5">行為治理（能做什麼）</tspan><tspan fill="#5F5E5A">｜</tspan><tspan fill="#534AB7">資料治理（能查什麼）</tspan><tspan fill="#5F5E5A">｜</tspan><tspan fill="#0F6E56">規則治理（誰能改規則）</tspan></text>
+
+<!-- ===== Demo 1 ===== -->
+<text x="140" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#185FA5">Demo 1　攔截 + 監控</text>
+
+<rect x="40" y="98" width="200" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text x="140" y="116" text-anchor="middle" font-size="12" font-weight="500" fill="#0C447C">readonly 一句話</text>
+<text x="140" y="133" text-anchor="middle" font-size="12" fill="#185FA5">查財報 + 寄到外部</text>
+
+<line x1="140" y1="144" x2="140" y2="168" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="168" width="200" height="64" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+<text x="140" y="188" text-anchor="middle" font-size="12" font-weight="500" fill="#633806">Policy Gate</text>
+<text x="140" y="207" text-anchor="middle" font-size="12" fill="#854F0B">search 放行</text>
+<text x="140" y="224" text-anchor="middle" font-size="12" fill="#854F0B">send_email 擋下</text>
+
+<line x1="140" y1="232" x2="140" y2="256" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="256" width="200" height="64" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="140" y="276" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">兩個 counter 一起跳</text>
+<text x="140" y="295" text-anchor="middle" font-size="12" fill="#0F6E56">allow++ / blocked++</text>
+<text x="140" y="312" text-anchor="middle" font-size="12" fill="#0F6E56">停用 gate → send_email 真執行</text>
+
+<!-- ===== Demo 2 ===== -->
+<text x="340" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#534AB7">Demo 2　retrieval ACL</text>
+
+<rect x="240" y="98" width="200" height="46" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="340" y="116" text-anchor="middle" font-size="12" font-weight="500" fill="#3C3489">admin / readonly 同句</text>
+<text x="340" y="133" text-anchor="middle" font-size="12" fill="#534AB7">問機密主題</text>
+
+<line x1="340" y1="144" x2="340" y2="168" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="240" y="168" width="200" height="64" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+<text x="340" y="188" text-anchor="middle" font-size="12" font-weight="500" fill="#633806">query 前就判斷</text>
+<text x="340" y="207" text-anchor="middle" font-size="12" fill="#854F0B">readonly → restricted query 不發 /ask</text>
+<text x="340" y="224" text-anchor="middle" font-size="12" fill="#854F0B">admin → 允許 restricted retrieval</text>
+
+<line x1="340" y1="232" x2="340" y2="256" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="240" y="256" width="200" height="64" rx="8" fill="#FBEAF0" stroke="#993556" stroke-width="0.5"/>
+<text x="340" y="276" text-anchor="middle" font-size="12" font-weight="500" fill="#72243E">第三態 require_approval</text>
+<text x="340" y="295" text-anchor="middle" font-size="12" fill="#993556">升級給不同 role 核准</text>
+<text x="340" y="312" text-anchor="middle" font-size="12" fill="#993556">Rego 寫好、口頭補</text>
+
+<!-- ===== Demo 3 ===== -->
+<text x="540" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#0F6E56">Demo 3　Agent 提議 + CI</text>
+
+<rect x="440" y="98" width="200" height="46" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="540" y="116" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">policy 有破口</text>
+<text x="540" y="133" text-anchor="middle" font-size="12" fill="#0F6E56">blocked_reason 點出</text>
+
+<line x1="540" y1="144" x2="540" y2="168" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="440" y="168" width="200" height="64" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="540" y="188" text-anchor="middle" font-size="12" font-weight="500" fill="#3C3489">Agent 產生 policy patch</text>
+<text x="540" y="207" text-anchor="middle" font-size="12" fill="#534AB7">只有提議權</text>
+<text x="540" y="224" text-anchor="middle" font-size="12" fill="#534AB7">不直接上線</text>
+
+<line x1="540" y1="232" x2="540" y2="256" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="440" y="256" width="200" height="64" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+<text x="540" y="276" text-anchor="middle" font-size="12" font-weight="500" fill="#633806">opa test 紅 → 綠</text>
+<text x="540" y="295" text-anchor="middle" font-size="12" fill="#854F0B">第一次故意 FAIL</text>
+<text x="540" y="312" text-anchor="middle" font-size="12" fill="#854F0B">CI 綠燈才合併</text>
+
+<!-- ===== 可觀測 / 稽核驗證層（橫跨三欄）===== -->
+<rect x="40" y="326" width="600" height="34" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text x="340" y="347" text-anchor="middle" font-size="12" font-weight="500" fill="#712B13">可觀測 / 稽核：metrics dashboard + audit log，驗證三段治理有效（事後追溯）</text>
+
+<!-- ===== 底部共用核心 + 收束 ===== -->
+<line x1="140" y1="320" x2="140" y2="326" stroke="#888780" stroke-width="1.5"/>
+<line x1="340" y1="320" x2="340" y2="326" stroke="#888780" stroke-width="1.5"/>
+<line x1="540" y1="320" x2="540" y2="326" stroke="#888780" stroke-width="1.5"/>
+<line x1="340" y1="360" x2="340" y2="372" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="160" y="372" width="360" height="50" rx="8" fill="#F1EFE8" stroke="#888780" stroke-width="0.5"/>
+<text x="340" y="392" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">三段共用同一個 tool 執行前的 Policy Gate</text>
+<text x="340" y="410" text-anchor="middle" font-size="12" fill="#444441">default allow := false（正面表列；不確定就 deny）</text>
+
+<!-- 貫穿敘事 -->
+<rect x="40" y="446" width="600" height="92" rx="12" fill="#F1EFE8" stroke="#888780" stroke-width="0.5"/>
+<text x="64" y="470" font-size="13" font-weight="500" fill="#2C2C2A">貫穿三段的主軸</text>
+<text x="64" y="492" font-size="12" fill="#444441">• search_knowledge_base 真打去年 rag-qa-bot 的 /ask，去年的 repo 一行沒改</text>
+<text x="64" y="512" font-size="12" fill="#444441">• 攔的是結構化 tool call，不是猜測 prompt 意圖 — 不賭偵測，賭越權動作執行不了</text>
+<text x="64" y="532" font-size="12" fill="#444441">• 治理是否有效：事前三段擋 + 事後 dashboard / audit log 驗證 + Demo 3 的 test / CI 把關</text>
+</svg>
