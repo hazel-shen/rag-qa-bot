@@ -41,17 +41,28 @@ CACHE_BACKEND=memory
 
 > `gpt-5.4-mini`（及更新的 reasoning 系列）使用 `max_completion_tokens`，已在 `llm.py` 處理，換回舊模型不需額外修改。
 
-**3. Ingest & 建索引**（在 `backend/` 下執行，會呼叫 Embedding API）
+**3. Ingest & 建索引**（會呼叫 Embedding API）
+
+> ⚠️ 以下指令全部在 **`backend/`** 目錄下執行。`.env` 的路徑（`INDEX_PATH=./data/index.faiss` 等）以此為基準。
+
+> ⚠️ 執行前請先確認 `git lfs pull` 已完成，否則 `data/raw/` 下的檔案只是 LFS pointer，ingest 結果會是無效字串。
 
 ```bash
-python -m app.ingest.cli_ingest --input ./data/raw --out ./data
+cd backend/
+
+# Step 3a：清洗與切片（輸出到 data/clean/）
+python -m app.ingest.cli_ingest \
+  --input ./data/raw \
+  --out ./data
+
+# Step 3b：建立 FAISS 向量索引
 python -m app.build_index \
   --chunks ./data/clean/chunks.jsonl \
   --docstore ./data/docstore.jsonl \
   --index ./data/index.faiss
 ```
 
-**4. 啟動服務**
+**4. 啟動服務**（同樣在 **`backend/`** 目錄下執行）
 
 ```bash
 uvicorn app.main:app --reload --port 8000
