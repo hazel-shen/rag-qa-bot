@@ -24,9 +24,15 @@ scrape_configs:
 
   # Agent Governance Demo：scrape Pushgateway（Demo CLI push 進來的 counter）
   - job_name: "agent-governance"
+    scrape_interval: 5s
     honor_labels: true
     static_configs:
       - targets: ["host.docker.internal:9091"]
+
+  # OPA server 原生 /metrics（含決策延遲 histogram）
+  - job_name: "opa"
+    static_configs:
+      - targets: ["host.docker.internal:8181"]
 
   # - job_name: "redis"
   #   static_configs:
