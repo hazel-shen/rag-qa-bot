@@ -1,5 +1,6 @@
 {
   "title": "Agent Governance — Policy Gate",
+  "description": "Agent Governance Policy Gate — demo 環境示意數據，非生產統計",
   "uid": "agent-governance-v1",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -13,33 +14,40 @@
     "opa"
   ],
   "templating": {
-    "list": [
-      {
-        "name": "DS_PROMETHEUS",
-        "type": "datasource",
-        "pluginId": "prometheus",
-        "current": {},
-        "hide": 0,
-        "label": "Prometheus"
-      }
-    ]
+    "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "refresh": "10s",
+  "refresh": "5s",
   "panels": [
     {
-      "id": 100,
-      "type": "row",
-      "title": "【Demo 1 / 2 / 3】Policy Gate 總覽",
-      "collapsed": false,
+      "id": 999,
+      "type": "text",
+      "title": "",
       "gridPos": {
         "x": 0,
         "y": 0,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "⚠️ **示意數據（illustrative）** — 本 dashboard 來自 demo 環境，數據用於說明治理機制，非生產統計。"
+      },
+      "transparent": false
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "總覽 — Policy Gate",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 2,
         "w": 24,
         "h": 1
       }
@@ -47,14 +55,14 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "【D1/2/3】Total ALLOW",
+      "title": "Total ALLOW",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 1,
+        "y": 3,
         "w": 4,
         "h": 4
       },
@@ -99,14 +107,14 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "【D1/2/3】Total BLOCKED",
+      "title": "Total BLOCKED",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 4,
-        "y": 1,
+        "y": 3,
         "w": 4,
         "h": 4
       },
@@ -151,14 +159,14 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "【D1/2/3】Total REQUIRE_APPROVAL",
+      "title": "Total REQUIRE_APPROVAL",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 8,
-        "y": 1,
+        "y": 3,
         "w": 4,
         "h": 4
       },
@@ -203,7 +211,7 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "【D1/2/3】Block Rate",
+      "title": "Block Rate",
       "description": "BLOCKED / (ALLOW + BLOCKED + APPROVAL)",
       "datasource": {
         "type": "prometheus",
@@ -211,7 +219,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 1,
+        "y": 3,
         "w": 4,
         "h": 4
       },
@@ -258,16 +266,130 @@
       ]
     },
     {
+      "id": 60,
+      "type": "stat",
+      "title": "最後 push 距今",
+      "description": "資料新鮮度：demo 跑了但資料沒進來時這顆先變紅。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 30
+              },
+              {
+                "color": "red",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "time() - max(push_time_seconds{job=\"agent-governance-demo\"})",
+          "legendFormat": "seconds ago",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "type": "stat",
+      "title": "OPA 決策延遲 p99",
+      "description": "Gate 多增加的決策延遲，sub-millisecond 量級為正常。",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"opa\", handler=\"v1/data\"}[5m])))",
+          "legendFormat": "p99 latency",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 5,
       "type": "timeseries",
-      "title": "【D1/2/3】Gate 決策趨勢（累計）",
+      "title": "Gate 決策趨勢（累計）",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 7,
         "w": 24,
         "h": 7
       },
@@ -357,11 +479,11 @@
     {
       "id": 200,
       "type": "row",
-      "title": "【Demo 1 / 2 / 3】決策明細 — by Tool & Role",
+      "title": "行為治理（Demo 1）— Agent 能做什麼",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 14,
         "w": 24,
         "h": 1
       }
@@ -369,14 +491,14 @@
     {
       "id": 6,
       "type": "bargauge",
-      "title": "【D1/2/3】Allow by Tool",
+      "title": "Allow by Tool",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 13,
+        "y": 15,
         "w": 8,
         "h": 7
       },
@@ -411,14 +533,14 @@
     {
       "id": 7,
       "type": "bargauge",
-      "title": "【D1/2/3】Blocked by Tool",
+      "title": "Blocked by Tool",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 8,
-        "y": 13,
+        "y": 15,
         "w": 8,
         "h": 7
       },
@@ -451,16 +573,17 @@
       ]
     },
     {
-      "id": 8,
+      "id": 62,
       "type": "bargauge",
-      "title": "【D1/2/3】Approval by Tool",
+      "title": "Blocked by Reason",
+      "description": "哪類原因最常被擋，是治理收束段的核心重點。",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 16,
-        "y": 13,
+        "y": 15,
         "w": 8,
         "h": 7
       },
@@ -471,7 +594,7 @@
             "lastNotNull"
           ]
         },
-        "displayMode": "gradient",
+        "displayMode": "basic",
         "valueMode": "color"
       },
       "fieldConfig": {
@@ -479,15 +602,15 @@
           "unit": "short",
           "color": {
             "mode": "fixed",
-            "fixedColor": "orange"
+            "fixedColor": "red"
           }
         },
         "overrides": []
       },
       "targets": [
         {
-          "expr": "sum by (tool) (tool_gate_approval_total{job=\"agent-governance-demo\"})",
-          "legendFormat": "{{tool}}",
+          "expr": "sum by (reason) (tool_gate_blocked_total{job=\"agent-governance-demo\"})",
+          "legendFormat": "{{reason}}",
           "refId": "A"
         }
       ]
@@ -495,14 +618,14 @@
     {
       "id": 9,
       "type": "bargauge",
-      "title": "【D1/2/3】Allow by Role",
+      "title": "Allow by Role",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 20,
+        "y": 22,
         "w": 8,
         "h": 7
       },
@@ -537,14 +660,14 @@
     {
       "id": 10,
       "type": "bargauge",
-      "title": "【D1/2/3】Blocked by Role",
+      "title": "Blocked by Role",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 8,
-        "y": 20,
+        "y": 22,
         "w": 8,
         "h": 7
       },
@@ -577,71 +700,17 @@
       ]
     },
     {
-      "id": 11,
-      "type": "bargauge",
-      "title": "【D1/2/3】Approval by Role",
+      "id": 12,
+      "type": "table",
+      "title": "BLOCKED — Tool × Role",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 16,
-        "y": 20,
+        "y": 22,
         "w": 8,
-        "h": 7
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "displayMode": "gradient",
-        "valueMode": "color"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "orange"
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum by (role) (tool_gate_approval_total{job=\"agent-governance-demo\"})",
-          "legendFormat": "{{role}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 300,
-      "type": "row",
-      "title": "【Demo 1 / 2 / 3】攔截明細 — Tool × Role",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 27,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 12,
-      "type": "table",
-      "title": "【D1/2/3】BLOCKED — Tool × Role",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 28,
-        "w": 12,
         "h": 7
       },
       "options": {
@@ -688,7 +757,7 @@
       },
       "targets": [
         {
-          "expr": "tool_gate_blocked_total{job=\"agent-governance-demo\"}",
+          "expr": "sum by (tool, role) (tool_gate_blocked_total{job=\"agent-governance-demo\"})",
           "legendFormat": "{{tool}} / {{role}}",
           "refId": "A",
           "instant": true,
@@ -707,21 +776,134 @@
               ]
             }
           }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitCount": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "資料治理（Demo 2）— Agent 能查什麼",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Approval by Tool",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 8,
+        "h": 7
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "displayMode": "gradient",
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (tool) (tool_gate_approval_total{job=\"agent-governance-demo\"})",
+          "legendFormat": "{{tool}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Approval by Role",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 30,
+        "w": 8,
+        "h": 7
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "displayMode": "gradient",
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (role) (tool_gate_approval_total{job=\"agent-governance-demo\"})",
+          "legendFormat": "{{role}}",
+          "refId": "A"
         }
       ]
     },
     {
       "id": 13,
       "type": "table",
-      "title": "【D1/2/3】REQUIRE_APPROVAL — Tool × Role",
+      "title": "REQUIRE_APPROVAL — Tool × Role",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 28,
-        "w": 12,
+        "x": 16,
+        "y": 30,
+        "w": 8,
         "h": 7
       },
       "options": {
@@ -768,7 +950,7 @@
       },
       "targets": [
         {
-          "expr": "tool_gate_approval_total{job=\"agent-governance-demo\"}",
+          "expr": "sum by (tool, role) (tool_gate_approval_total{job=\"agent-governance-demo\"})",
           "legendFormat": "{{tool}} / {{role}}",
           "refId": "A",
           "instant": true,
@@ -787,17 +969,858 @@
               ]
             }
           }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitCount": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "規則治理（Demo 3）— 誰能改規則",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 30,
+          "type": "stat",
+          "title": "Anomaly 觸發次數",
+          "description": "deny 累積超過門栖，自動觸發 _on_anomaly callback 的次數。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 38,
+            "w": 6,
+            "h": 4
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 3
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum(policy_anomaly_triggered_total{job=\"agent-governance-demo\"}) or vector(0)",
+              "legendFormat": "anomaly triggers",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 31,
+          "type": "bargauge",
+          "title": "Anomaly 觸發 by Tool × Role",
+          "description": "哪個 tool + role 組合累積觸發最多次。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 6,
+            "y": 38,
+            "w": 10,
+            "h": 4
+          },
+          "options": {
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "displayMode": "gradient",
+            "valueMode": "color"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "orange"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum by (tool, role) (policy_anomaly_triggered_total{job=\"agent-governance-demo\"})",
+              "legendFormat": "{{tool}} / {{role}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 32,
+          "type": "timeseries",
+          "title": "Deny 累積速率（訊號來源）",
+          "description": "rate(tool_gate_blocked_total[1m]) by tool+role。迷い峰即是 anomaly 觸發點。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 42,
+            "w": 24,
+            "h": 6
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum by (tool, role) (rate(tool_gate_blocked_total{job=\"agent-governance-demo\"}[1m]))",
+              "legendFormat": "{{tool}} / {{role}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 40,
+          "type": "stat",
+          "title": "Patch 提案次數",
+          "description": "LLM 呼叫 propose_policy_patch 的累積次數。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 48,
+            "w": 6,
+            "h": 4
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum(policy_patch_proposed_total{job=\"agent-governance-demo\"}) or vector(0)",
+              "legendFormat": "proposed",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 41,
+          "type": "stat",
+          "title": "Patch 採納（Human 核准）",
+          "description": "人類審核後按 y 採納的次數。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 6,
+            "y": 48,
+            "w": 6,
+            "h": 4
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum(policy_patch_accepted_total{job=\"agent-governance-demo\"}) or vector(0)",
+              "legendFormat": "accepted",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 42,
+          "type": "stat",
+          "title": "Patch 拒絕（Human 駁回）",
+          "description": "人類審核後按 N 拒絕的次數。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 48,
+            "w": 6,
+            "h": 4
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "red"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum(policy_patch_rejected_total{job=\"agent-governance-demo\"}) or vector(0)",
+              "legendFormat": "rejected",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 43,
+          "type": "stat",
+          "title": "Patch 採納率",
+          "description": "accepted / (accepted + rejected)。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 18,
+            "y": 48,
+            "w": 6,
+            "h": 4
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.5
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.8
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum(policy_patch_accepted_total{job=\"agent-governance-demo\"}) / clamp_min((sum(policy_patch_accepted_total{job=\"agent-governance-demo\"}) + sum(policy_patch_rejected_total{job=\"agent-governance-demo\"})), 1)",
+              "legendFormat": "acceptance rate",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "stat",
+          "title": "Baseline — OPA Test 全綠基準線",
+          "description": "Demo 開始前 OPA test 全綠基準線",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 52,
+            "w": 8,
+            "h": 5
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "PASS ✓",
+                      "color": "green",
+                      "index": 0
+                    },
+                    "0": {
+                      "text": "FAIL ✗",
+                      "color": "red",
+                      "index": 1
+                    }
+                  }
+                },
+                {
+                  "type": "special",
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "未執行",
+                      "color": "gray",
+                      "index": 2
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "opa_test_result{job=\"agent-governance-demo\", stage=\"baseline\"}",
+              "legendFormat": "baseline",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "type": "stat",
+          "title": "After Patch — 預期紅燈",
+          "description": "套用測試 patch 後，預期紅燈",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 52,
+            "w": 8,
+            "h": 5
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "PASS ✓",
+                      "color": "green",
+                      "index": 0
+                    },
+                    "0": {
+                      "text": "FAIL ✗",
+                      "color": "red",
+                      "index": 1
+                    }
+                  }
+                },
+                {
+                  "type": "special",
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "未執行",
+                      "color": "gray",
+                      "index": 2
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "opa_test_result{job=\"agent-governance-demo\", stage=\"after_patch\"}",
+              "legendFormat": "after_patch",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "type": "stat",
+          "title": "After Fix — 預期綠燈（CI 核准）",
+          "description": "修正 rego 後，預期綠燈 — CI 可 merge",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 52,
+            "w": 8,
+            "h": 5
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "PASS ✓",
+                      "color": "green",
+                      "index": 0
+                    },
+                    "0": {
+                      "text": "FAIL ✗",
+                      "color": "red",
+                      "index": 1
+                    }
+                  }
+                },
+                {
+                  "type": "special",
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "未執行",
+                      "color": "gray",
+                      "index": 2
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "opa_test_result{job=\"agent-governance-demo\", stage=\"after_fix\"}",
+              "legendFormat": "after_fix",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 17,
+          "type": "state-timeline",
+          "title": "OPA Test 狀態歷史（PASS/FAIL 色帶）",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 57,
+            "w": 24,
+            "h": 7
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            },
+            "mergeValues": true,
+            "rowHeight": 0.9
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "PASS ✓",
+                      "color": "green",
+                      "index": 0
+                    },
+                    "0": {
+                      "text": "FAIL ✗",
+                      "color": "red",
+                      "index": 1
+                    }
+                  }
+                },
+                {
+                  "type": "special",
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "未執行",
+                      "color": "gray",
+                      "index": 2
+                    }
+                  }
+                }
+              ],
+              "custom": {
+                "fillOpacity": 70
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "opa_test_result{job=\"agent-governance-demo\"}",
+              "legendFormat": "{{stage}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 50,
+          "type": "bargauge",
+          "title": "OPA Test 執行次數 by Stage",
+          "description": "每個 stage 被跟成功執行了幾次 opa test。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 64,
+            "w": 8,
+            "h": 6
+          },
+          "options": {
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "displayMode": "gradient",
+            "valueMode": "color"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum by (stage) (opa_test_run_total{job=\"agent-governance-demo\"})",
+              "legendFormat": "{{stage}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 51,
+          "type": "bargauge",
+          "title": "OPA Test 耗時（最後一次）by Stage",
+          "description": "opa test 最後一次执行的秒數，讓觀眾感受「CI 真的在跟」。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 64,
+            "w": 8,
+            "h": 6
+          },
+          "options": {
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "displayMode": "gradient",
+            "valueMode": "color"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum by (stage, result) (opa_test_duration_seconds{job=\"agent-governance-demo\"})",
+              "legendFormat": "{{stage}} ({{result}})",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 52,
+          "type": "timeseries",
+          "title": "OPA Test 耗時歷史（紅燈→綠燈轉折）",
+          "description": "opa_test_duration_seconds 時間軸變化，可看出 after_patch（紅）到 after_fix（綠）的転折點。",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 64,
+            "w": 8,
+            "h": 6
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "sum by (stage) (opa_test_duration_seconds{job=\"agent-governance-demo\"})",
+              "legendFormat": "{{stage}}",
+              "refId": "A"
+            }
+          ]
         }
       ]
     },
     {
       "id": 500,
       "type": "row",
-      "title": "【Demo 1 / 2 / 3】Audit Log — 每筆決策記錄",
+      "title": "事後驗證 — Audit",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 38,
         "w": 24,
         "h": 1
       }
@@ -805,7 +1828,7 @@
     {
       "id": 20,
       "type": "table",
-      "title": "【D1/2/3】Audit 明細 — 每筆決策完整脈絡",
+      "title": "Audit 明細 — 每筆決策完整脈絡",
       "description": "tool_gate_audit_event：每筆各有唯一 request_id。可看出是 OPA 還是 fallback 跟哪一版 policy 決定、哪一個 caller 發出。",
       "datasource": {
         "type": "prometheus",
@@ -813,7 +1836,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 39,
         "w": 24,
         "h": 8
       },
@@ -904,79 +1927,28 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "id": 21,
-      "type": "stat",
-      "title": "【D3】Anomaly Trigger 次數",
-      "description": "deny 累積超過門栖，自動觸發 propose_policy_patch 的次數。門栖預設 3，可用環境變數 ANOMALY_THRESHOLD 調整。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 44,
-        "w": 6,
-        "h": 4
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          }
         },
-        "overrides": []
-      },
-      "targets": [
         {
-          "expr": "count(tool_gate_audit_event{job=\"agent-governance-demo\", decision=\"deny\"} >= 3) or vector(0)",
-          "legendFormat": "anomaly triggers",
-          "refId": "A"
+          "id": "limit",
+          "options": {
+            "limitCount": 20
+          }
         }
       ]
     },
     {
       "id": 22,
       "type": "piechart",
-      "title": "【D1/2/3】Audit 決策分布",
+      "title": "Audit 決策分布",
       "description": "所有 audit 筆數按 decision 分布圓餅圖。",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "x": 6,
-        "y": 44,
-        "w": 9,
+        "x": 0,
+        "y": 47,
+        "w": 12,
         "h": 8
       },
       "options": {
@@ -1057,16 +2029,16 @@
     {
       "id": 23,
       "type": "bargauge",
-      "title": "【D1/2/3】Audit 決策 by policy_version",
+      "title": "Audit 決策 by policy_version",
       "description": "OPA 決定 vs fallback 各占幾筆，可看出是否有呼叫走到 OPA binary。",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "x": 15,
-        "y": 44,
-        "w": 9,
+        "x": 12,
+        "y": 47,
+        "w": 12,
         "h": 8
       },
       "options": {
@@ -1094,802 +2066,6 @@
           "legendFormat": "{{policy_version}}",
           "refId": "A",
           "instant": true
-        }
-      ]
-    },
-    {
-      "id": 400,
-      "type": "row",
-      "title": "【Demo 3】OPA Test 狀態（規則治理）",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 52,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 14,
-      "type": "stat",
-      "title": "【D3 ①】Baseline — OPA Test 全綠基準線",
-      "description": "Demo 開始前 OPA test 全綠基準線",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 53,
-        "w": 8,
-        "h": 5
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "value_and_name",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "mappings": [
-          {
-            "type": "value",
-            "options": {
-              "0": {
-                "text": "FAIL",
-                "color": "red"
-              },
-              "1": {
-                "text": "PASS",
-                "color": "green"
-              }
-            }
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_result{job=\"agent-governance-demo\", stage=\"baseline\"}",
-          "legendFormat": "baseline",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 15,
-      "type": "stat",
-      "title": "【D3 ③】After Patch — 預期紅燈",
-      "description": "套用測試 patch 後，預期紅燈",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 8,
-        "y": 53,
-        "w": 8,
-        "h": 5
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "value_and_name",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "mappings": [
-          {
-            "type": "value",
-            "options": {
-              "0": {
-                "text": "FAIL",
-                "color": "red"
-              },
-              "1": {
-                "text": "PASS",
-                "color": "green"
-              }
-            }
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_result{job=\"agent-governance-demo\", stage=\"after_patch\"}",
-          "legendFormat": "after_patch",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 16,
-      "type": "stat",
-      "title": "【D3 ④】After Fix — 預期綠燈（CI 核准）",
-      "description": "修正 rego 後，預期綠燈 — CI 可 merge",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 53,
-        "w": 8,
-        "h": 5
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "value_and_name",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "mappings": [
-          {
-            "type": "value",
-            "options": {
-              "0": {
-                "text": "FAIL",
-                "color": "red"
-              },
-              "1": {
-                "text": "PASS",
-                "color": "green"
-              }
-            }
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_result{job=\"agent-governance-demo\", stage=\"after_fix\"}",
-          "legendFormat": "after_fix",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 600,
-      "type": "row",
-      "title": "【Demo 3】Anomaly Detection 訊號",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 65,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 30,
-      "type": "stat",
-      "title": "【D3 ②】Anomaly 觸發次數",
-      "description": "deny 累積超過門栖，自動觸發 _on_anomaly callback 的次數。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 66,
-        "w": 6,
-        "h": 4
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum(policy_anomaly_triggered_total{job=\"agent-governance-demo\"}) or vector(0)",
-          "legendFormat": "anomaly triggers",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 31,
-      "type": "bargauge",
-      "title": "【D3 ②】Anomaly 觸發 by Tool × Role",
-      "description": "哪個 tool + role 組合累積觸發最多次。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 6,
-        "y": 66,
-        "w": 10,
-        "h": 4
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "displayMode": "gradient",
-        "valueMode": "color"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "orange"
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum by (tool, role) (policy_anomaly_triggered_total{job=\"agent-governance-demo\"})",
-          "legendFormat": "{{tool}} / {{role}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 32,
-      "type": "timeseries",
-      "title": "【D3 ②】Deny 累積速率（訊號來源）",
-      "description": "rate(tool_gate_blocked_total[1m]) by tool+role。迷い峰即是 anomaly 觸發點。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 70,
-        "w": 24,
-        "h": 6
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "rate(tool_gate_blocked_total{job=\"agent-governance-demo\"}[1m])",
-          "legendFormat": "{{tool}} / {{role}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 700,
-      "type": "row",
-      "title": "【Demo 3】Policy Patch 生命週期",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 76,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 40,
-      "type": "stat",
-      "title": "【D3 ②】Patch 提案次數",
-      "description": "LLM 呼叫 propose_policy_patch 的累積次數。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 77,
-        "w": 6,
-        "h": 4
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum(policy_patch_proposed_total{job=\"agent-governance-demo\"}) or vector(0)",
-          "legendFormat": "proposed",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 41,
-      "type": "stat",
-      "title": "【D3 ③】Patch 採納（Human 核准）",
-      "description": "人類審核後按 y 採納的次數。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 6,
-        "y": 77,
-        "w": 6,
-        "h": 4
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "green"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "policy_patch_accepted_total{job=\"agent-governance-demo\"} or vector(0)",
-          "legendFormat": "accepted",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 42,
-      "type": "stat",
-      "title": "【D3 ③】Patch 拒絕（Human 駁回）",
-      "description": "人類審核後按 N 拒絕的次數。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 77,
-        "w": 6,
-        "h": 4
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "red"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "policy_patch_rejected_total{job=\"agent-governance-demo\"} or vector(0)",
-          "legendFormat": "rejected",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 43,
-      "type": "stat",
-      "title": "【D3 ③】Patch 採納率",
-      "description": "accepted / (accepted + rejected)。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 18,
-        "y": 77,
-        "w": 6,
-        "h": 4
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.5
-              },
-              {
-                "color": "green",
-                "value": 0.8
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "policy_patch_accepted_total{job=\"agent-governance-demo\"} / clamp_min((policy_patch_accepted_total{job=\"agent-governance-demo\"} + policy_patch_rejected_total{job=\"agent-governance-demo\"}), 1)",
-          "legendFormat": "acceptance rate",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 800,
-      "type": "row",
-      "title": "【Demo 3】OPA Test 執行結果與耗時",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 81,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 50,
-      "type": "bargauge",
-      "title": "【D3 ③④】OPA Test 執行次數 by Stage",
-      "description": "每個 stage 被跟成功執行了幾次 opa test。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 82,
-        "w": 8,
-        "h": 6
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "displayMode": "gradient",
-        "valueMode": "color"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_run_total{job=\"agent-governance-demo\"}",
-          "legendFormat": "{{stage}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 51,
-      "type": "bargauge",
-      "title": "【D3 ③④】OPA Test 耗時（最後一次）by Stage",
-      "description": "opa test 最後一次执行的秒數，讓觀眾感受「CI 真的在跟」。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 8,
-        "y": 82,
-        "w": 8,
-        "h": 6
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "displayMode": "gradient",
-        "valueMode": "color"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_duration_seconds{job=\"agent-governance-demo\"}",
-          "legendFormat": "{{stage}} ({{result}})",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 52,
-      "type": "timeseries",
-      "title": "【D3 ③→④】OPA Test 耗時歷史（紅燈→綠燈轉折）",
-      "description": "opa_test_duration_seconds 時間軸變化，可看出 after_patch（紅）到 after_fix（綠）的転折點。",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 82,
-        "w": 8,
-        "h": 6
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 15
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_duration_seconds{job=\"agent-governance-demo\"}",
-          "legendFormat": "{{stage}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 17,
-      "type": "timeseries",
-      "title": "【D3】OPA Test 狀態歷史（1=PASS, 0=FAIL）",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 58,
-        "w": 24,
-        "h": 7
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "max": 1,
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 20,
-            "drawStyle": "line",
-            "stacking": {
-              "mode": "none"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "opa_test_result{job=\"agent-governance-demo\"}",
-          "legendFormat": "{{stage}}",
-          "refId": "A"
         }
       ]
     }
