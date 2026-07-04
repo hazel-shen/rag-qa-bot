@@ -620,6 +620,5 @@
   "timezone": "",
   "title": "FAQ Bot — Overview (RAG + LLM)",
   "version": 3,
-  "weekStart": "",
-  "uid": "faq-bot-overview-v2"
+  "weekStart": ""
 }
